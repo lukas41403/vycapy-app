@@ -55,6 +55,13 @@ export default function TabLayout() {
           tabBarIcon: () => <Text style={{ fontSize: 20 }}>🏟️</Text>,
         }}
       />
+      <Tabs.Screen
+        name="kontakty"
+        options={{
+          title: 'Kontakty',
+          tabBarIcon: () => <Text style={{ fontSize: 20 }}>📞</Text>,
+        }}
+      />
     </Tabs>
   );
 }
