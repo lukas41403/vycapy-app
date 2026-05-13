@@ -30,6 +30,14 @@ type Hlasenie = {
   historia?: HistoriaZaznam[]
 }
 
+type AktualitaItem = {
+  id: string
+  title: string
+  is_published: boolean
+  published_at: string | null
+  kategoria: string
+}
+
 const STATUS_FARBY: Record<string, { bg: string; text: string; label: string }> = {
   nove:       { bg: '#E3F2FD', text: '#1565C0', label: 'Nové' },
   v_rieseni:  { bg: '#FFF8E1', text: '#F57F17', label: 'V riešení' },
@@ -196,12 +204,39 @@ export default function AdminScreen() {
 }
 
 function NovAktualitaForm() {
+  const [podtab, setPodtab] = useState<'nova' | 'zoznam'>('nova')
+  const [aktuality, setAktuality] = useState<AktualitaItem[]>([])
+  const [nacitavam, setNacitavam] = useState(false)
   const [title, setTitle] = useState('')
   const [perex, setPerex] = useState('')
   const [body, setBody] = useState('')
   const [kategoria, setKategoria] = useState('oznam')
   const [loading, setLoading] = useState(false)
   const [publikovat, setPublikovat] = useState(true)
+
+  async function nacitajAktuality() {
+    setNacitavam(true)
+    const { data } = await supabase
+      .from('aktuality')
+      .select('id, title, is_published, published_at, kategoria')
+      .order('created_at', { ascending: false })
+      .limit(30)
+    setAktuality(data || [])
+    setNacitavam(false)
+  }
+
+  async function zmazAktualitu(id: string) {
+    Alert.alert('Zmazať?', 'Naozaj chcete zmazať túto aktualitu?', [
+      { text: 'Zrušiť', style: 'cancel' },
+      {
+        text: 'Zmazať', style: 'destructive',
+        onPress: async () => {
+          await supabase.from('aktuality').delete().eq('id', id)
+          nacitajAktuality()
+        }
+      }
+    ])
+  }
 
   async function publikovatAktualitu() {
     if (title.trim().length < 3) {
@@ -226,87 +261,110 @@ function NovAktualitaForm() {
       Alert.alert('Chyba', 'Aktualitu sa nepodarilo uložiť.')
     } else {
       Alert.alert('Hotovo!', publikovat ? 'Aktualita bola publikovaná.' : 'Uložená ako koncept.')
-      setTitle('')
-      setPerex('')
-      setBody('')
-      setKategoria('oznam')
+      setTitle(''); setPerex(''); setBody(''); setKategoria('oznam')
     }
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-      <Text style={styles.sekcia}>✍️ Nová aktualita</Text>
-      <View style={styles.formCard}>
-        <Text style={styles.formLabel}>Kategória</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {AKTUALITA_KATEGORIE.map(k => (
-              <TouchableOpacity
-                key={k}
-                style={[styles.katBtn, kategoria === k && styles.katBtnActive]}
-                onPress={() => setKategoria(k)}
-              >
-                <Text style={[styles.katBtnText, kategoria === k && styles.katBtnTextActive]}>
-                  {AKTUALITA_KATEGORIE_LABEL[k]}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
-
-        <Text style={styles.formLabel}>Titulok *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Titulok aktuality..."
-          placeholderTextColor="#BBB"
-          value={title}
-          onChangeText={setTitle}
-        />
-
-        <Text style={styles.formLabel}>Perex (krátky úvod)</Text>
-        <TextInput
-          style={[styles.input, { height: 80 }]}
-          placeholder="Krátky popis ktorý sa zobrazí v zozname..."
-          placeholderTextColor="#BBB"
-          value={perex}
-          onChangeText={setPerex}
-          multiline
-          textAlignVertical="top"
-        />
-
-        <Text style={styles.formLabel}>Text aktuality *</Text>
-        <TextInput
-          style={[styles.input, { height: 160 }]}
-          placeholder="Celý text aktuality..."
-          placeholderTextColor="#BBB"
-          value={body}
-          onChangeText={setBody}
-          multiline
-          textAlignVertical="top"
-        />
-
-        <View style={styles.publikovatRow}>
-          <Text style={styles.formLabel}>Publikovať ihneď</Text>
-          <TouchableOpacity
-            style={[styles.toggle, publikovat && styles.toggleActive]}
-            onPress={() => setPublikovat(!publikovat)}
-          >
-            <View style={[styles.toggleKnob, publikovat && styles.toggleKnobActive]} />
-          </TouchableOpacity>
-        </View>
-
+    <View style={{ flex: 1 }}>
+      <View style={styles.podtaby}>
         <TouchableOpacity
-          style={[styles.submitBtn, loading && { opacity: 0.6 }]}
-          onPress={publikovatAktualitu}
-          disabled={loading}
+          style={[styles.podtab, podtab === 'nova' && styles.podtabActive]}
+          onPress={() => setPodtab('nova')}
         >
-          {loading
-            ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.submitBtnText}>{publikovat ? '🚀 Publikovať' : '💾 Uložiť koncept'}</Text>
-          }
+          <Text style={[styles.podtabText, podtab === 'nova' && styles.podtabTextActive]}>✍️ Nová</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.podtab, podtab === 'zoznam' && styles.podtabActive]}
+          onPress={() => { setPodtab('zoznam'); nacitajAktuality() }}
+        >
+          <Text style={[styles.podtabText, podtab === 'zoznam' && styles.podtabTextActive]}>📋 Zoznam</Text>
         </TouchableOpacity>
       </View>
-    </ScrollView>
+
+      {podtab === 'nova' ? (
+        <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+          <View style={styles.formCard}>
+            <Text style={styles.formLabel}>Kategória</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {AKTUALITA_KATEGORIE.map(k => (
+                  <TouchableOpacity
+                    key={k}
+                    style={[styles.katBtn, kategoria === k && styles.katBtnActive]}
+                    onPress={() => setKategoria(k)}
+                  >
+                    <Text style={[styles.katBtnText, kategoria === k && styles.katBtnTextActive]}>
+                      {AKTUALITA_KATEGORIE_LABEL[k]}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+            <Text style={styles.formLabel}>Titulok *</Text>
+            <TextInput style={styles.input} placeholder="Titulok aktuality..."
+              placeholderTextColor="#BBB" value={title} onChangeText={setTitle} />
+            <Text style={styles.formLabel}>Perex (krátky úvod)</Text>
+            <TextInput style={[styles.input, { height: 80 }]}
+              placeholder="Krátky popis..." placeholderTextColor="#BBB"
+              value={perex} onChangeText={setPerex} multiline textAlignVertical="top" />
+            <Text style={styles.formLabel}>Text aktuality *</Text>
+            <TextInput style={[styles.input, { height: 160 }]}
+              placeholder="Celý text..." placeholderTextColor="#BBB"
+              value={body} onChangeText={setBody} multiline textAlignVertical="top" />
+            <View style={styles.publikovatRow}>
+              <Text style={styles.formLabel}>Publikovať ihneď</Text>
+              <TouchableOpacity
+                style={[styles.toggle, publikovat && styles.toggleActive]}
+                onPress={() => setPublikovat(!publikovat)}
+              >
+                <View style={[styles.toggleKnob, publikovat && styles.toggleKnobActive]} />
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={[styles.submitBtn, loading && { opacity: 0.6 }]}
+              onPress={publikovatAktualitu} disabled={loading}
+            >
+              {loading ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.submitBtnText}>{publikovat ? '🚀 Publikovať' : '💾 Uložiť koncept'}</Text>}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      ) : (
+        <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+          {nacitavam ? (
+            <ActivityIndicator size="large" color="#2E7D32" style={{ marginTop: 40 }} />
+          ) : aktuality.map(a => (
+            <View key={a.id} style={styles.karta}>
+              <View style={styles.kartaHeader}>
+                <View style={styles.kartaInfo}>
+                  <Text style={styles.kartaKategoria}>
+                    {AKTUALITA_KATEGORIE_LABEL[a.kategoria]?.toUpperCase()}
+                  </Text>
+                  <Text style={styles.kartaPopis} numberOfLines={2}>{a.title}</Text>
+                </View>
+                <View style={[styles.statusBadge, { backgroundColor: a.is_published ? '#E8F5E9' : '#FFF8E1' }]}>
+                  <Text style={[styles.statusText, { color: a.is_published ? '#2E7D32' : '#F57F17' }]}>
+                    {a.is_published ? 'Pub.' : 'Koncept'}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.kartaDatum}>
+                {a.published_at
+                  ? new Date(a.published_at).toLocaleDateString('sk-SK', { day: 'numeric', month: 'long', year: 'numeric' })
+                  : 'Nepublikovaná'}
+              </Text>
+              <TouchableOpacity
+                style={[styles.akciaBtn, { backgroundColor: '#FFEBEE', marginTop: 10, alignSelf: 'flex-start' }]}
+                onPress={() => zmazAktualitu(a.id)}
+              >
+                <Text style={[styles.akciaBtnText, { color: '#C62828' }]}>🗑️ Zmazať</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </ScrollView>
+      )}
+    </View>
   )
 }
 
@@ -343,12 +401,7 @@ function NovePodujatieForm() {
       Alert.alert('Chyba', 'Podujatie sa nepodarilo uložiť.')
     } else {
       Alert.alert('Hotovo!', 'Podujatie bolo pridané do kalendára.')
-      setTitle('')
-      setPopis('')
-      setDatumOd('')
-      setCas('')
-      setMiesto('')
-      setKategoria('ine')
+      setTitle(''); setPopis(''); setDatumOd(''); setCas(''); setMiesto(''); setKategoria('ine')
     }
   }
 
@@ -372,63 +425,29 @@ function NovePodujatieForm() {
             ))}
           </View>
         </ScrollView>
-
         <Text style={styles.formLabel}>Názov podujatia *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="napr. Deň obce 2026"
-          placeholderTextColor="#BBB"
-          value={title}
-          onChangeText={setTitle}
-        />
-
+        <TextInput style={styles.input} placeholder="napr. Deň obce 2026"
+          placeholderTextColor="#BBB" value={title} onChangeText={setTitle} />
         <Text style={styles.formLabel}>Dátum * (RRRR-MM-DD)</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="napr. 2026-06-15"
-          placeholderTextColor="#BBB"
-          value={datumOd}
-          onChangeText={setDatumOd}
-        />
-
+        <TextInput style={styles.input} placeholder="napr. 2026-06-15"
+          placeholderTextColor="#BBB" value={datumOd} onChangeText={setDatumOd} />
         <Text style={styles.formLabel}>Čas (HH:MM)</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="napr. 15:00"
-          placeholderTextColor="#BBB"
-          value={cas}
-          onChangeText={setCas}
-        />
-
+        <TextInput style={styles.input} placeholder="napr. 15:00"
+          placeholderTextColor="#BBB" value={cas} onChangeText={setCas} />
         <Text style={styles.formLabel}>Miesto</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="napr. Kultúrny dom"
-          placeholderTextColor="#BBB"
-          value={miesto}
-          onChangeText={setMiesto}
-        />
-
+        <TextInput style={styles.input} placeholder="napr. Kultúrny dom"
+          placeholderTextColor="#BBB" value={miesto} onChangeText={setMiesto} />
         <Text style={styles.formLabel}>Popis</Text>
-        <TextInput
-          style={[styles.input, { height: 100 }]}
+        <TextInput style={[styles.input, { height: 100 }]}
           placeholder="Krátky popis podujatia..."
-          placeholderTextColor="#BBB"
-          value={popis}
-          onChangeText={setPopis}
-          multiline
-          textAlignVertical="top"
-        />
-
+          placeholderTextColor="#BBB" value={popis} onChangeText={setPopis}
+          multiline textAlignVertical="top" />
         <TouchableOpacity
           style={[styles.submitBtn, loading && { opacity: 0.6 }]}
-          onPress={ulozPodujatie}
-          disabled={loading}
+          onPress={ulozPodujatie} disabled={loading}
         >
-          {loading
-            ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.submitBtnText}>📅 Pridať do kalendára</Text>
-          }
+          {loading ? <ActivityIndicator color="#fff" />
+            : <Text style={styles.submitBtnText}>📅 Pridať do kalendára</Text>}
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -457,10 +476,8 @@ function HlasenieKarta({ hlasenie: h, updating, onZmenStatus }: {
           <Text style={[styles.statusText, { color: statusInfo.text }]}>{statusInfo.label}</Text>
         </View>
       </View>
-
       <Text style={styles.kartaPopis}>{h.popis}</Text>
       {h.adresa && <Text style={styles.kartaAdresa}>📍 {h.adresa}</Text>}
-
       {updating ? (
         <ActivityIndicator size="small" color="#2E7D32" style={{ marginTop: 12 }} />
       ) : (
@@ -482,7 +499,6 @@ function HlasenieKarta({ hlasenie: h, updating, onZmenStatus }: {
           )}
         </View>
       )}
-
       {h.historia && h.historia.length > 0 && (
         <View style={styles.historiaContainer}>
           <Text style={styles.historiaTitle}>HISTÓRIA ZMIEN</Text>
@@ -535,6 +551,14 @@ const styles = StyleSheet.create({
   tabActive: { borderBottomWidth: 3, borderBottomColor: '#2E7D32' },
   tabText: { fontSize: 12, fontWeight: '600', color: '#999' },
   tabTextActive: { color: '#2E7D32' },
+  podtaby: {
+    flexDirection: 'row', backgroundColor: '#F7F8FA',
+    borderBottomWidth: 1, borderBottomColor: '#EEEEEE',
+  },
+  podtab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
+  podtabActive: { borderBottomWidth: 2, borderBottomColor: '#2E7D32' },
+  podtabText: { fontSize: 13, fontWeight: '600', color: '#999' },
+  podtabTextActive: { color: '#2E7D32' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   list: { padding: 16, gap: 10 },
   sekcia: { fontSize: 13, fontWeight: '700', color: '#666', marginBottom: 4, marginTop: 4 },
