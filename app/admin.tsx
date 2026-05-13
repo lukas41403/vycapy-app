@@ -48,8 +48,18 @@ const AKTUALITA_KATEGORIE_LABEL: Record<string, string> = {
   vypadok: 'Výpadok', sport: 'Šport', ine: 'Iné',
 }
 
+const PODUJATIE_KATEGORIE = [
+  { id: 'kultura', label: '🎭 Kultúra' },
+  { id: 'sport', label: '⚽ Šport' },
+  { id: 'slavnost', label: '🎉 Slávnosť' },
+  { id: 'kino', label: '🎬 Kino' },
+  { id: 'divadlo', label: '🎪 Divadlo' },
+  { id: 'deti', label: '🎈 Pre deti' },
+  { id: 'ine', label: '📅 Iné' },
+]
+
 export default function AdminScreen() {
-  const [aktTab, setAktTab] = useState<'hlasenia' | 'aktuality'>('hlasenia')
+  const [aktTab, setAktTab] = useState<'hlasenia' | 'aktuality' | 'podujatia'>('hlasenia')
   const [hlasenia, setHlasenia] = useState<Hlasenie[]>([])
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
@@ -135,6 +145,14 @@ export default function AdminScreen() {
             📰 Aktuality
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, aktTab === 'podujatia' && styles.tabActive]}
+          onPress={() => setAktTab('podujatia')}
+        >
+          <Text style={[styles.tabText, aktTab === 'podujatia' && styles.tabTextActive]}>
+            📅 Podujatia
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {aktTab === 'hlasenia' ? (
@@ -168,8 +186,10 @@ export default function AdminScreen() {
             )}
           </ScrollView>
         )
-      ) : (
+      ) : aktTab === 'aktuality' ? (
         <NovAktualitaForm />
+      ) : (
+        <NovePodujatieForm />
       )}
     </SafeAreaView>
   )
@@ -290,6 +310,131 @@ function NovAktualitaForm() {
   )
 }
 
+function NovePodujatieForm() {
+  const [title, setTitle] = useState('')
+  const [popis, setPopis] = useState('')
+  const [kategoria, setKategoria] = useState('ine')
+  const [datumOd, setDatumOd] = useState('')
+  const [cas, setCas] = useState('')
+  const [miesto, setMiesto] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function ulozPodujatie() {
+    if (title.trim().length < 3) {
+      Alert.alert('Chýba názov', 'Názov musí mať aspoň 3 znaky.')
+      return
+    }
+    if (!datumOd) {
+      Alert.alert('Chýba dátum', 'Zadajte dátum podujatia.')
+      return
+    }
+    const datum = new Date(`${datumOd}T${cas || '00:00'}`)
+    setLoading(true)
+    const { error } = await supabase.from('podujatia').insert({
+      title: title.trim(),
+      popis: popis.trim() || null,
+      kategoria,
+      datum_od: datum.toISOString(),
+      miesto: miesto.trim() || null,
+      is_published: true,
+    })
+    setLoading(false)
+    if (error) {
+      Alert.alert('Chyba', 'Podujatie sa nepodarilo uložiť.')
+    } else {
+      Alert.alert('Hotovo!', 'Podujatie bolo pridané do kalendára.')
+      setTitle('')
+      setPopis('')
+      setDatumOd('')
+      setCas('')
+      setMiesto('')
+      setKategoria('ine')
+    }
+  }
+
+  return (
+    <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+      <Text style={styles.sekcia}>📅 Nové podujatie</Text>
+      <View style={styles.formCard}>
+        <Text style={styles.formLabel}>Kategória</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {PODUJATIE_KATEGORIE.map(k => (
+              <TouchableOpacity
+                key={k.id}
+                style={[styles.katBtn, kategoria === k.id && styles.katBtnActive]}
+                onPress={() => setKategoria(k.id)}
+              >
+                <Text style={[styles.katBtnText, kategoria === k.id && styles.katBtnTextActive]}>
+                  {k.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+
+        <Text style={styles.formLabel}>Názov podujatia *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="napr. Deň obce 2026"
+          placeholderTextColor="#BBB"
+          value={title}
+          onChangeText={setTitle}
+        />
+
+        <Text style={styles.formLabel}>Dátum * (RRRR-MM-DD)</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="napr. 2026-06-15"
+          placeholderTextColor="#BBB"
+          value={datumOd}
+          onChangeText={setDatumOd}
+        />
+
+        <Text style={styles.formLabel}>Čas (HH:MM)</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="napr. 15:00"
+          placeholderTextColor="#BBB"
+          value={cas}
+          onChangeText={setCas}
+        />
+
+        <Text style={styles.formLabel}>Miesto</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="napr. Kultúrny dom"
+          placeholderTextColor="#BBB"
+          value={miesto}
+          onChangeText={setMiesto}
+        />
+
+        <Text style={styles.formLabel}>Popis</Text>
+        <TextInput
+          style={[styles.input, { height: 100 }]}
+          placeholder="Krátky popis podujatia..."
+          placeholderTextColor="#BBB"
+          value={popis}
+          onChangeText={setPopis}
+          multiline
+          textAlignVertical="top"
+        />
+
+        <TouchableOpacity
+          style={[styles.submitBtn, loading && { opacity: 0.6 }]}
+          onPress={ulozPodujatie}
+          disabled={loading}
+        >
+          {loading
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={styles.submitBtnText}>📅 Pridať do kalendára</Text>
+          }
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  )
+}
+
 function HlasenieKarta({ hlasenie: h, updating, onZmenStatus }: {
   hlasenie: Hlasenie
   updating: boolean
@@ -388,7 +533,7 @@ const styles = StyleSheet.create({
   },
   tab: { flex: 1, paddingVertical: 14, alignItems: 'center' },
   tabActive: { borderBottomWidth: 3, borderBottomColor: '#2E7D32' },
-  tabText: { fontSize: 14, fontWeight: '600', color: '#999' },
+  tabText: { fontSize: 12, fontWeight: '600', color: '#999' },
   tabTextActive: { color: '#2E7D32' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   list: { padding: 16, gap: 10 },
