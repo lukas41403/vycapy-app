@@ -2,11 +2,13 @@ import { supabase } from '@/src/lib/supabase'
 import { useEffect, useState } from 'react'
 import {
     ActivityIndicator,
+    Alert,
     SafeAreaView,
     ScrollView,
     StatusBar,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View,
 } from 'react-native'
@@ -39,7 +41,14 @@ const KATEGORIA_EMOJI: Record<string, string> = {
   voda: '💧', odpad: '🗑️', ine: '📋',
 }
 
+const AKTUALITA_KATEGORIE = ['oznam', 'akcia', 'uzavierka', 'vypadok', 'sport', 'ine']
+const AKTUALITA_KATEGORIE_LABEL: Record<string, string> = {
+  oznam: 'Oznam', akcia: 'Akcia', uzavierka: 'Uzávierka',
+  vypadok: 'Výpadok', sport: 'Šport', ine: 'Iné',
+}
+
 export default function AdminScreen() {
+  const [aktTab, setAktTab] = useState<'hlasenia' | 'aktuality'>('hlasenia')
   const [hlasenia, setHlasenia] = useState<Hlasenie[]>([])
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
@@ -64,30 +73,21 @@ export default function AdminScreen() {
   async function zmenStatus(id: string, novyStatus: string) {
     setUpdating(id)
     const stareHlasenie = hlasenia.find(h => h.id === id)
-
-    await supabase
-      .from('hlaseniaporuchy')
-      .update({ status: novyStatus })
-      .eq('id', id)
-
-    await supabase
-      .from('hlasenia_historia')
-      .insert({
-        hlasenie_id: id,
-        stary_status: stareHlasenie?.status,
-        novy_status: novyStatus,
-      })
-
+    await supabase.from('hlaseniaporuchy').update({ status: novyStatus }).eq('id', id)
+    await supabase.from('hlasenia_historia').insert({
+      hlasenie_id: id,
+      stary_status: stareHlasenie?.status,
+      novy_status: novyStatus,
+    })
     await nacitajHlasenia()
     setUpdating(null)
   }
 
   const nove = hlasenia.filter(h => h.status === 'nove')
-  const ostatne = hlasenia.filter(h => h.status !== 'nove')
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor="#1B5E20" />
+      <StatusBar barStyle="light-content" backgroundColor="#1B5E20" />
 
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -105,37 +105,179 @@ export default function AdminScreen() {
         </View>
       </View>
 
-      {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#2E7D32" />
-        </View>
+      {/* TABY */}
+      <View style={styles.taby}>
+        <TouchableOpacity
+          style={[styles.tab, aktTab === 'hlasenia' && styles.tabActive]}
+          onPress={() => setAktTab('hlasenia')}
+        >
+          <Text style={[styles.tabText, aktTab === 'hlasenia' && styles.tabTextActive]}>
+            ⚠️ Hlásenia
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, aktTab === 'aktuality' && styles.tabActive]}
+          onPress={() => setAktTab('aktuality')}
+        >
+          <Text style={[styles.tabText, aktTab === 'aktuality' && styles.tabTextActive]}>
+            📰 Aktuality
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {aktTab === 'hlasenia' ? (
+        loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color="#2E7D32" />
+          </View>
+        ) : (
+          <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+            {nove.length > 0 && (
+              <>
+                <Text style={styles.sekcia}>🔴 Nové hlásenia ({nove.length})</Text>
+                {nove.map(h => (
+                  <HlasenieKarta key={h.id} hlasenie={h} updating={updating === h.id} onZmenStatus={zmenStatus} />
+                ))}
+              </>
+            )}
+            {hlasenia.filter(h => h.status !== 'nove').length > 0 && (
+              <>
+                <Text style={[styles.sekcia, { marginTop: 8 }]}>📋 Ostatné hlásenia</Text>
+                {hlasenia.filter(h => h.status !== 'nove').map(h => (
+                  <HlasenieKarta key={h.id} hlasenie={h} updating={updating === h.id} onZmenStatus={zmenStatus} />
+                ))}
+              </>
+            )}
+            {hlasenia.length === 0 && (
+              <View style={styles.empty}>
+                <Text style={styles.emptyEmoji}>📭</Text>
+                <Text style={styles.emptyText}>Žiadne hlásenia</Text>
+              </View>
+            )}
+          </ScrollView>
+        )
       ) : (
-        <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-          {nove.length > 0 && (
-            <>
-              <Text style={styles.sekcia}>🔴 Nové hlásenia ({nove.length})</Text>
-              {nove.map(h => (
-                <HlasenieKarta key={h.id} hlasenie={h} updating={updating === h.id} onZmenStatus={zmenStatus} />
-              ))}
-            </>
-          )}
-          {ostatne.length > 0 && (
-            <>
-              <Text style={[styles.sekcia, { marginTop: 8 }]}>📋 Ostatné hlásenia</Text>
-              {ostatne.map(h => (
-                <HlasenieKarta key={h.id} hlasenie={h} updating={updating === h.id} onZmenStatus={zmenStatus} />
-              ))}
-            </>
-          )}
-          {hlasenia.length === 0 && (
-            <View style={styles.empty}>
-              <Text style={styles.emptyEmoji}>📭</Text>
-              <Text style={styles.emptyText}>Žiadne hlásenia</Text>
-            </View>
-          )}
-        </ScrollView>
+        <NovAktualitaForm />
       )}
     </SafeAreaView>
+  )
+}
+
+function NovAktualitaForm() {
+  const [title, setTitle] = useState('')
+  const [perex, setPerex] = useState('')
+  const [body, setBody] = useState('')
+  const [kategoria, setKategoria] = useState('oznam')
+  const [loading, setLoading] = useState(false)
+  const [publikovat, setPublikovat] = useState(true)
+
+  async function publikovatAktualitu() {
+    if (title.trim().length < 3) {
+      Alert.alert('Chýba titulok', 'Titulok musí mať aspoň 3 znaky.')
+      return
+    }
+    if (body.trim().length < 10) {
+      Alert.alert('Chýba text', 'Text aktuality musí mať aspoň 10 znakov.')
+      return
+    }
+
+    setLoading(true)
+    const { error } = await supabase.from('aktuality').insert({
+      title: title.trim(),
+      perex: perex.trim() || null,
+      body: body.trim(),
+      kategoria,
+      is_published: publikovat,
+      published_at: publikovat ? new Date().toISOString() : null,
+    })
+    setLoading(false)
+
+    if (error) {
+      Alert.alert('Chyba', 'Aktualitu sa nepodarilo uložiť.')
+    } else {
+      Alert.alert('Hotovo!', publikovat ? 'Aktualita bola publikovaná.' : 'Aktualita bola uložená ako koncept.')
+      setTitle('')
+      setPerex('')
+      setBody('')
+      setKategoria('oznam')
+    }
+  }
+
+  return (
+    <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+      <Text style={styles.sekcia}>✍️ Nová aktualita</Text>
+
+      <View style={styles.formCard}>
+        <Text style={styles.formLabel}>Kategória</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {AKTUALITA_KATEGORIE.map(k => (
+              <TouchableOpacity
+                key={k}
+                style={[styles.katBtn, kategoria === k && styles.katBtnActive]}
+                onPress={() => setKategoria(k)}
+              >
+                <Text style={[styles.katBtnText, kategoria === k && styles.katBtnTextActive]}>
+                  {AKTUALITA_KATEGORIE_LABEL[k]}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+
+        <Text style={styles.formLabel}>Titulok *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Titulok aktuality..."
+          placeholderTextColor="#BBB"
+          value={title}
+          onChangeText={setTitle}
+        />
+
+        <Text style={styles.formLabel}>Perex (krátky úvod)</Text>
+        <TextInput
+          style={[styles.input, { height: 80 }]}
+          placeholder="Krátky popis ktorý sa zobrazí v zozname..."
+          placeholderTextColor="#BBB"
+          value={perex}
+          onChangeText={setPerex}
+          multiline
+          textAlignVertical="top"
+        />
+
+        <Text style={styles.formLabel}>Text aktuality *</Text>
+        <TextInput
+          style={[styles.input, { height: 160 }]}
+          placeholder="Celý text aktuality..."
+          placeholderTextColor="#BBB"
+          value={body}
+          onChangeText={setBody}
+          multiline
+          textAlignVertical="top"
+        />
+
+        <View style={styles.publikovatRow}>
+          <Text style={styles.formLabel}>Publikovať ihneď</Text>
+          <TouchableOpacity
+            style={[styles.toggle, publikovat && styles.toggleActive]}
+            onPress={() => setPublikovat(!publikovat)}
+          >
+            <View style={[styles.toggleKnob, publikovat && styles.toggleKnobActive]} />
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.submitBtn, loading && { opacity: 0.6 }]}
+          onPress={publikovatAktualitu}
+          disabled={loading}
+        >
+          {loading
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={styles.submitBtnText}>{publikovat ? '🚀 Publikovať' : '💾 Uložiť koncept'}</Text>
+          }
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
   )
 }
 
@@ -232,9 +374,51 @@ const styles = StyleSheet.create({
   },
   statNumber: { color: '#fff', fontSize: 20, fontWeight: '800' },
   statLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 10 },
+  taby: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEE',
+  },
+  tab: { flex: 1, paddingVertical: 14, alignItems: 'center' },
+  tabActive: { borderBottomWidth: 3, borderBottomColor: '#2E7D32' },
+  tabText: { fontSize: 14, fontWeight: '600', color: '#999' },
+  tabTextActive: { color: '#2E7D32' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   list: { padding: 16, gap: 10 },
   sekcia: { fontSize: 13, fontWeight: '700', color: '#666', marginBottom: 4, marginTop: 4 },
+  formCard: {
+    backgroundColor: '#fff', borderRadius: 14, padding: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+  },
+  formLabel: { fontSize: 13, fontWeight: '700', color: '#444', marginBottom: 8 },
+  input: {
+    borderWidth: 1.5, borderColor: '#E0E0E0', borderRadius: 10,
+    padding: 12, fontSize: 15, color: '#1A1A1A', marginBottom: 16,
+  },
+  katBtn: {
+    borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8,
+    backgroundColor: '#F5F5F5', borderWidth: 1.5, borderColor: '#E0E0E0',
+  },
+  katBtnActive: { backgroundColor: '#E8F5E9', borderColor: '#2E7D32' },
+  katBtnText: { fontSize: 13, fontWeight: '600', color: '#666' },
+  katBtnTextActive: { color: '#2E7D32' },
+  publikovatRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  toggle: {
+    width: 48, height: 28, borderRadius: 14,
+    backgroundColor: '#DDD', justifyContent: 'center', padding: 2,
+  },
+  toggleActive: { backgroundColor: '#2E7D32' },
+  toggleKnob: {
+    width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff',
+  },
+  toggleKnobActive: { alignSelf: 'flex-end' },
+  submitBtn: {
+    backgroundColor: '#2E7D32', borderRadius: 12,
+    padding: 16, alignItems: 'center',
+  },
+  submitBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   karta: {
     backgroundColor: '#fff', borderRadius: 14, padding: 16,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
