@@ -1,4 +1,5 @@
 import { useAktuality } from '@/src/hooks/useAktuality';
+import { useRouter } from 'expo-router';
 import {
   ActivityIndicator,
   FlatList,
@@ -26,12 +27,12 @@ const KATEGORIA_LABEL: Record<string, string> = {
 
 export default function AktualityScreen() {
   const { aktuality, loading, error } = useAktuality()
+  const router = useRouter()
 
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
-      {/* HEADER */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <View style={styles.logoBadge}>
@@ -45,7 +46,6 @@ export default function AktualityScreen() {
         <Text style={styles.sectionTitle}>Aktuality</Text>
       </View>
 
-      {/* OBSAH */}
       {loading && (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#2E7D32" />
@@ -77,7 +77,11 @@ export default function AktualityScreen() {
           renderItem={({ item }) => {
             const kat = KATEGORIA_FARBY[item.kategoria] ?? KATEGORIA_FARBY.ine
             return (
-              <TouchableOpacity style={styles.card} activeOpacity={0.75}>
+              <TouchableOpacity
+                style={styles.card}
+                activeOpacity={0.75}
+                onPress={() => router.push(`/aktualita/${item.id}`)}
+              >
                 <View style={styles.cardTop}>
                   <View style={[styles.badge, { backgroundColor: kat.bg }]}>
                     <Text style={[styles.badgeText, { color: kat.text }]}>
@@ -110,7 +114,6 @@ export default function AktualityScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F7F8FA' },
-
   header: {
     backgroundColor: '#fff',
     paddingHorizontal: 20,
@@ -126,18 +129,14 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   logoBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 44, height: 44, borderRadius: 12,
     backgroundColor: '#2E7D32',
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'center', alignItems: 'center',
   },
   logoText: { color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 1 },
   headerTitle: { fontSize: 17, fontWeight: '700', color: '#1A1A1A' },
   headerSub: { fontSize: 12, color: '#888', marginTop: 1 },
   sectionTitle: { fontSize: 24, fontWeight: '800', color: '#1A1A1A', letterSpacing: -0.5 },
-
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8 },
   loadingText: { color: '#888', fontSize: 14, marginTop: 8 },
   errorIcon: { fontSize: 36 },
@@ -145,9 +144,7 @@ const styles = StyleSheet.create({
   emptyIcon: { fontSize: 48, marginBottom: 8 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: '#333' },
   emptyText: { fontSize: 14, color: '#888' },
-
   list: { padding: 16, gap: 12 },
-
   card: {
     backgroundColor: '#fff',
     borderRadius: 16,
@@ -164,34 +161,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
-  badge: {
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
+  badge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
   badgeText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
   datum: { fontSize: 12, color: '#AAAAAA' },
-  cardTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#1A1A1A',
-    lineHeight: 24,
-    marginBottom: 6,
-  },
-  cardPerex: {
-    fontSize: 14,
-    color: '#555',
-    lineHeight: 21,
-    marginBottom: 12,
-  },
-  cardFooter: {
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-    paddingTop: 10,
-  },
-  readMore: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#2E7D32',
-  },
+  cardTitle: { fontSize: 17, fontWeight: '700', color: '#1A1A1A', lineHeight: 24, marginBottom: 6 },
+  cardPerex: { fontSize: 14, color: '#555', lineHeight: 21, marginBottom: 12 },
+  cardFooter: { borderTopWidth: 1, borderTopColor: '#F0F0F0', paddingTop: 10 },
+  readMore: { fontSize: 13, fontWeight: '600', color: '#2E7D32' },
 })
