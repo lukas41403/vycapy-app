@@ -1,4 +1,5 @@
 import { supabase } from '@/src/lib/supabase'
+import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import {
     ActivityIndicator,
@@ -52,6 +53,13 @@ export default function AdminScreen() {
   const [hlasenia, setHlasenia] = useState<Hlasenie[]>([])
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
+  const router = useRouter()
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) router.replace('/admin-login')
+    })
+  }, [])
 
   useEffect(() => {
     nacitajHlasenia()
@@ -99,20 +107,24 @@ export default function AdminScreen() {
             <Text style={styles.headerSub}>Výčapy-Opatovce</Text>
           </View>
         </View>
-        <View style={styles.statBadge}>
-          <Text style={styles.statNumber}>{nove.length}</Text>
-          <Text style={styles.statLabel}>nových</Text>
-        </View>
+        <TouchableOpacity
+          style={styles.logoutBtn}
+          onPress={async () => {
+            await supabase.auth.signOut()
+            router.replace('/admin-login')
+          }}
+        >
+          <Text style={styles.logoutText}>Odhlásiť</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* TABY */}
       <View style={styles.taby}>
         <TouchableOpacity
           style={[styles.tab, aktTab === 'hlasenia' && styles.tabActive]}
           onPress={() => setAktTab('hlasenia')}
         >
           <Text style={[styles.tabText, aktTab === 'hlasenia' && styles.tabTextActive]}>
-            ⚠️ Hlásenia
+            ⚠️ Hlásenia {nove.length > 0 && `(${nove.length})`}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -180,7 +192,6 @@ function NovAktualitaForm() {
       Alert.alert('Chýba text', 'Text aktuality musí mať aspoň 10 znakov.')
       return
     }
-
     setLoading(true)
     const { error } = await supabase.from('aktuality').insert({
       title: title.trim(),
@@ -191,11 +202,10 @@ function NovAktualitaForm() {
       published_at: publikovat ? new Date().toISOString() : null,
     })
     setLoading(false)
-
     if (error) {
       Alert.alert('Chyba', 'Aktualitu sa nepodarilo uložiť.')
     } else {
-      Alert.alert('Hotovo!', publikovat ? 'Aktualita bola publikovaná.' : 'Aktualita bola uložená ako koncept.')
+      Alert.alert('Hotovo!', publikovat ? 'Aktualita bola publikovaná.' : 'Uložená ako koncept.')
       setTitle('')
       setPerex('')
       setBody('')
@@ -206,7 +216,6 @@ function NovAktualitaForm() {
   return (
     <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
       <Text style={styles.sekcia}>✍️ Nová aktualita</Text>
-
       <View style={styles.formCard}>
         <Text style={styles.formLabel}>Kategória</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
@@ -368,17 +377,14 @@ const styles = StyleSheet.create({
   logoText: { color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 1 },
   headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
   headerSub: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 1 },
-  statBadge: {
-    backgroundColor: '#FF5252', borderRadius: 12,
-    padding: 10, alignItems: 'center', minWidth: 56,
+  logoutBtn: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6,
   },
-  statNumber: { color: '#fff', fontSize: 20, fontWeight: '800' },
-  statLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 10 },
+  logoutText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   taby: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
+    flexDirection: 'row', backgroundColor: '#fff',
+    borderBottomWidth: 1, borderBottomColor: '#EEEEEE',
   },
   tab: { flex: 1, paddingVertical: 14, alignItems: 'center' },
   tabActive: { borderBottomWidth: 3, borderBottomColor: '#2E7D32' },
@@ -404,15 +410,16 @@ const styles = StyleSheet.create({
   katBtnActive: { backgroundColor: '#E8F5E9', borderColor: '#2E7D32' },
   katBtnText: { fontSize: 13, fontWeight: '600', color: '#666' },
   katBtnTextActive: { color: '#2E7D32' },
-  publikovatRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  publikovatRow: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: 16,
+  },
   toggle: {
     width: 48, height: 28, borderRadius: 14,
     backgroundColor: '#DDD', justifyContent: 'center', padding: 2,
   },
   toggleActive: { backgroundColor: '#2E7D32' },
-  toggleKnob: {
-    width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff',
-  },
+  toggleKnob: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff' },
   toggleKnobActive: { alignSelf: 'flex-end' },
   submitBtn: {
     backgroundColor: '#2E7D32', borderRadius: 12,
