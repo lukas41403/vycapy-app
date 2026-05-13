@@ -41,6 +41,13 @@ export default function TabLayout() {
           tabBarIcon: () => <Text style={{ fontSize: 20 }}>⚠️</Text>,
         }}
       />
+      <Tabs.Screen
+        name="podujatia"
+        options={{
+          title: 'Podujatia',
+          tabBarIcon: () => <Text style={{ fontSize: 20 }}>📅</Text>,
+        }}
+      />
     </Tabs>
   );
 }
