@@ -1,8 +1,10 @@
+import { ErbBadge } from '@/components/AppHeader'
+import { C } from '@/constants/colors'
 import { supabase } from '@/src/lib/supabase'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import {
-    ActivityIndicator, SafeAreaView, StyleSheet,
+    ActivityIndicator, SafeAreaView, StatusBar, StyleSheet,
     Text, TextInput, TouchableOpacity, View,
 } from 'react-native'
 
@@ -33,9 +35,10 @@ export default function AdminLogin() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.background} />
       <View style={styles.container}>
-        <View style={styles.logoBadge}>
-          <Text style={styles.logoText}>V–O</Text>
+        <View style={styles.logoWrap}>
+          <ErbBadge variant="plain" />
         </View>
         <Text style={styles.title}>Admin panel</Text>
         <Text style={styles.sub}>Výčapy-Opatovce</Text>
@@ -51,7 +54,7 @@ export default function AdminLogin() {
           <TextInput
             style={styles.input}
             placeholder="admin@vycapy-opatovce.sk"
-            placeholderTextColor="#BBB"
+            placeholderTextColor={C.textPlaceholder}
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
@@ -62,7 +65,7 @@ export default function AdminLogin() {
           <TextInput
             style={styles.input}
             placeholder="••••••••"
-            placeholderTextColor="#BBB"
+            placeholderTextColor={C.textPlaceholder}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -74,10 +77,14 @@ export default function AdminLogin() {
             disabled={loading}
           >
             {loading
-              ? <ActivityIndicator color="#fff" />
+              ? <ActivityIndicator color={C.onPrimary} />
               : <Text style={styles.btnText}>Prihlásiť sa</Text>
             }
           </TouchableOpacity>
+
+          <Text style={styles.disclaimer}>
+            Prístup len pre poverené osoby obecného úradu.
+          </Text>
         </View>
       </View>
     </SafeAreaView>
@@ -85,36 +92,47 @@ export default function AdminLogin() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F7F8FA' },
+  safe: { flex: 1, backgroundColor: C.background },
   container: {
     flex: 1, justifyContent: 'center',
     alignItems: 'center', padding: 32,
   },
-  logoBadge: {
-    width: 72, height: 72, borderRadius: 20,
-    backgroundColor: '#1B5E20',
+  logoWrap: {
+    width: 88, height: 88, borderRadius: 24,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.borderLight,
     justifyContent: 'center', alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
+    shadowColor: C.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  logoText: { color: '#fff', fontWeight: '800', fontSize: 20, letterSpacing: 1 },
-  title: { fontSize: 26, fontWeight: '800', color: '#1A1A1A', marginBottom: 4 },
-  sub: { fontSize: 14, color: '#888', marginBottom: 40 },
+  title: { fontSize: 26, fontWeight: '800', color: C.text, marginBottom: 4 },
+  sub: { fontSize: 14, color: C.textMuted, marginBottom: 40 },
   form: { width: '100%', maxWidth: 400 },
   errorBox: {
-    backgroundColor: '#FFEBEE', borderRadius: 10,
+    backgroundColor: C.primaryLight, borderRadius: 10,
     padding: 12, marginBottom: 16,
+    borderLeftWidth: 4, borderLeftColor: C.primary,
   },
-  errorText: { color: '#C62828', fontSize: 14, textAlign: 'center' },
-  label: { fontSize: 13, fontWeight: '700', color: '#444', marginBottom: 8 },
+  errorText: { color: C.brand.redDark, fontSize: 14, textAlign: 'center', fontWeight: '600' },
+  label: { fontSize: 13, fontWeight: '700', color: C.textSecondary, marginBottom: 8 },
   input: {
-    borderWidth: 1.5, borderColor: '#E0E0E0',
+    borderWidth: 1.5, borderColor: C.border,
     borderRadius: 12, padding: 14,
-    fontSize: 15, color: '#1A1A1A',
-    backgroundColor: '#fff', marginBottom: 16,
+    fontSize: 15, color: C.text,
+    backgroundColor: C.surface, marginBottom: 16,
   },
   btn: {
-    backgroundColor: '#1B5E20', borderRadius: 14,
+    backgroundColor: C.primary, borderRadius: 14,
     padding: 18, alignItems: 'center', marginTop: 8,
   },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  btnText: { color: C.onPrimary, fontSize: 16, fontWeight: '700' },
+  disclaimer: {
+    fontSize: 12, color: C.textMuted, textAlign: 'center',
+    marginTop: 20, lineHeight: 18,
+  },
 })

@@ -1,3 +1,5 @@
+import { AppHeader } from '@/components/AppHeader'
+import { C } from '@/constants/colors'
 import { supabase } from '@/src/lib/supabase'
 import { useState } from 'react'
 import {
@@ -82,13 +84,13 @@ export default function HlasenieScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <StatusBar barStyle="dark-content" backgroundColor={C.surface} />
       <ScrollView showsVerticalScrollIndicator={false}>
 
-        <View style={styles.header}>
-          <Text style={styles.sectionTitle}>Hlásenie porúch</Text>
-          <Text style={styles.headerSub}>Nahláste problém obecnému úradu</Text>
-        </View>
+        <AppHeader
+          title="Hlásenie porúch"
+          subtitle="Nahláste problém obecnému úradu"
+        />
 
         <View style={styles.content}>
 
@@ -115,7 +117,7 @@ export default function HlasenieScreen() {
           <TextInput
             style={styles.input}
             placeholder="napr. Hlavná ulica 12, pri parku..."
-            placeholderTextColor="#BBBBBB"
+            placeholderTextColor={C.textPlaceholder}
             value={adresa}
             onChangeText={setAdresa}
           />
@@ -125,7 +127,7 @@ export default function HlasenieScreen() {
           <TextInput
             style={[styles.input, styles.textArea]}
             placeholder="Opíšte problém čo najpresnejšie..."
-            placeholderTextColor="#BBBBBB"
+            placeholderTextColor={C.textPlaceholder}
             value={popis}
             onChangeText={setPopis}
             multiline
@@ -142,7 +144,7 @@ export default function HlasenieScreen() {
             activeOpacity={0.8}
           >
             {loading
-              ? <ActivityIndicator color="#fff" />
+              ? <ActivityIndicator color={C.onPrimary} />
               : <Text style={styles.submitBtnText}>Odoslať hlásenie</Text>
             }
           </TouchableOpacity>
@@ -158,19 +160,9 @@ export default function HlasenieScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F7F8FA' },
-  header: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
-  },
-  sectionTitle: { fontSize: 24, fontWeight: '800', color: '#1A1A1A', letterSpacing: -0.5 },
-  headerSub: { fontSize: 13, color: '#888', marginTop: 4 },
+  safe: { flex: 1, backgroundColor: C.background },
   content: { padding: 20, gap: 8 },
-  label: { fontSize: 14, fontWeight: '700', color: '#333', marginTop: 12, marginBottom: 8 },
+  label: { fontSize: 14, fontWeight: '700', color: C.text, marginTop: 12, marginBottom: 8 },
 
   kategorieGrid: {
     flexDirection: 'row',
@@ -179,61 +171,61 @@ const styles = StyleSheet.create({
   },
   kategoriaCard: {
     width: '47%',
-    backgroundColor: '#fff',
+    backgroundColor: C.surface,
     borderRadius: 12,
     padding: 14,
     alignItems: 'center',
     gap: 6,
     borderWidth: 2,
-    borderColor: '#EEEEEE',
-    shadowColor: '#000',
+    borderColor: C.borderLight,
+    shadowColor: C.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
     shadowRadius: 4,
     elevation: 1,
   },
   kategoriaCardActive: {
-    borderColor: '#2E7D32',
-    backgroundColor: '#F1F8F1',
+    borderColor: C.primary,
+    backgroundColor: C.primaryLight,
   },
   kategoriaEmoji: { fontSize: 28 },
-  kategoriaLabel: { fontSize: 12, fontWeight: '600', color: '#555', textAlign: 'center' },
-  kategoriaLabelActive: { color: '#2E7D32' },
+  kategoriaLabel: { fontSize: 12, fontWeight: '600', color: C.textSecondary, textAlign: 'center' },
+  kategoriaLabelActive: { color: C.primary },
 
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: C.surface,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#E0E0E0',
+    borderColor: C.border,
     padding: 14,
     fontSize: 15,
-    color: '#1A1A1A',
+    color: C.text,
   },
   textArea: { height: 120, paddingTop: 14 },
-  charCount: { fontSize: 12, color: '#BBBBBB', textAlign: 'right', marginTop: 4 },
+  charCount: { fontSize: 12, color: C.textPlaceholder, textAlign: 'right', marginTop: 4 },
 
   submitBtn: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: C.primary,
     borderRadius: 14,
     padding: 18,
     alignItems: 'center',
     marginTop: 16,
   },
   submitBtnDisabled: { opacity: 0.6 },
-  submitBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  submitBtnText: { color: C.onPrimary, fontSize: 16, fontWeight: '700' },
 
-  disclaimer: { fontSize: 12, color: '#AAAAAA', textAlign: 'center', marginTop: 8, lineHeight: 18 },
+  disclaimer: { fontSize: 12, color: C.textPlaceholder, textAlign: 'center', marginTop: 8, lineHeight: 18 },
 
   successContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, gap: 16 },
   successEmoji: { fontSize: 64 },
-  successTitle: { fontSize: 24, fontWeight: '800', color: '#1A1A1A' },
-  successText: { fontSize: 15, color: '#555', textAlign: 'center', lineHeight: 22 },
+  successTitle: { fontSize: 24, fontWeight: '800', color: C.text },
+  successText: { fontSize: 15, color: C.textSecondary, textAlign: 'center', lineHeight: 22 },
   resetBtn: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: C.secondary,
     borderRadius: 14,
     paddingHorizontal: 32,
     paddingVertical: 16,
     marginTop: 8,
   },
-  resetBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  resetBtnText: { color: C.onPrimary, fontSize: 15, fontWeight: '700' },
 })

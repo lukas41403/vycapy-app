@@ -1,3 +1,4 @@
+import { C } from '@/constants/colors'
 import { supabase } from '@/src/lib/supabase'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
@@ -17,12 +18,12 @@ type Aktualita = {
 }
 
 const KATEGORIA_FARBY: Record<string, { bg: string; text: string }> = {
-  oznam:     { bg: '#E3F2FD', text: '#1565C0' },
-  akcia:     { bg: '#E8F5E9', text: '#2E7D32' },
+  oznam:     C.status.info,
+  akcia:     C.status.success,
   uzavierka: { bg: '#FFF3E0', text: '#E65100' },
-  vypadok:   { bg: '#FFEBEE', text: '#C62828' },
-  sport:     { bg: '#F3E5F5', text: '#6A1B9A' },
-  ine:       { bg: '#ECEFF1', text: '#37474F' },
+  vypadok:   C.status.danger,
+  sport:     C.status.accent,
+  ine:       C.status.neutral,
 }
 
 const KATEGORIA_LABEL: Record<string, string> = {
@@ -51,7 +52,7 @@ export default function AktualitaDetail() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <StatusBar barStyle="dark-content" backgroundColor={C.surface} />
 
       <View style={styles.navBar}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -61,7 +62,7 @@ export default function AktualitaDetail() {
 
       {loading && (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#2E7D32" />
+          <ActivityIndicator size="large" color={C.primary} />
         </View>
       )}
 
@@ -101,22 +102,22 @@ export default function AktualitaDetail() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
+  safe: { flex: 1, backgroundColor: C.surface },
   navBar: {
     paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#EEEEEE',
+    borderBottomWidth: 1, borderBottomColor: C.borderLight,
   },
   backBtn: { alignSelf: 'flex-start' },
-  backText: { fontSize: 16, color: '#2E7D32', fontWeight: '600' },
+  backText: { fontSize: 16, color: C.primary, fontWeight: '700' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   content: { padding: 20 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
   badge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
   badgeText: { fontSize: 11, fontWeight: '700' },
-  datum: { fontSize: 13, color: '#AAAAAA' },
-  title: { fontSize: 26, fontWeight: '800', color: '#1A1A1A', lineHeight: 34, marginBottom: 12 },
-  perex: { fontSize: 17, color: '#444', lineHeight: 26, marginBottom: 16, fontWeight: '500' },
-  divider: { height: 1, backgroundColor: '#F0F0F0', marginBottom: 20 },
-  body: { fontSize: 16, color: '#333', lineHeight: 26 },
-  errorText: { fontSize: 16, color: '#888' },
+  datum: { fontSize: 13, color: C.textPlaceholder },
+  title: { fontSize: 26, fontWeight: '800', color: C.text, lineHeight: 34, marginBottom: 12 },
+  perex: { fontSize: 17, color: C.textSecondary, lineHeight: 26, marginBottom: 16, fontWeight: '500' },
+  divider: { height: 1, backgroundColor: C.divider, marginBottom: 20 },
+  body: { fontSize: 16, color: C.text, lineHeight: 26 },
+  errorText: { fontSize: 16, color: C.textMuted },
 })

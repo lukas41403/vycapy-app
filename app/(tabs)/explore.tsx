@@ -1,3 +1,5 @@
+import { AppHeader } from '@/components/AppHeader'
+import { C } from '@/constants/colors'
 import { useOdpady } from '@/src/hooks/useOdpady'
 import {
   ActivityIndicator,
@@ -30,16 +32,16 @@ export default function OdpadyScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <StatusBar barStyle="dark-content" backgroundColor={C.surface} />
 
-      <View style={styles.header}>
-        <Text style={styles.sectionTitle}>Odpadový kalendár</Text>
-        <Text style={styles.headerSub}>Najbližšie vývozy odpadu</Text>
-      </View>
+      <AppHeader
+        title="Odpadový kalendár"
+        subtitle="Najbližšie vývozy odpadu"
+      />
 
       {loading && (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#2E7D32" />
+          <ActivityIndicator size="large" color={C.primary} />
           <Text style={styles.loadingText}>Načítavam...</Text>
         </View>
       )}
@@ -52,9 +54,12 @@ export default function OdpadyScreen() {
       )}
 
       {!loading && !error && odpady.length === 0 && (
-        <View style={styles.center}>
+        <View style={styles.empty}>
           <Text style={styles.emptyIcon}>🗓️</Text>
           <Text style={styles.emptyTitle}>Žiadne plánované vývozy</Text>
+          <Text style={styles.emptyText}>
+            Harmonogram bude doplnený. Skontrolujte oficiálnu stránku obce.
+          </Text>
         </View>
       )}
 
@@ -95,37 +100,43 @@ export default function OdpadyScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F7F8FA' },
-  header: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
-  },
-  sectionTitle: { fontSize: 24, fontWeight: '800', color: '#1A1A1A', letterSpacing: -0.5 },
-  headerSub: { fontSize: 13, color: '#888', marginTop: 4 },
+  safe: { flex: 1, backgroundColor: C.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8 },
-  loadingText: { color: '#888', fontSize: 14, marginTop: 8 },
+  loadingText: { color: C.textMuted, fontSize: 14, marginTop: 8 },
   errorIcon: { fontSize: 36 },
-  errorText: { color: '#C62828', fontSize: 15 },
-  emptyIcon: { fontSize: 48, marginBottom: 8 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#333' },
+  errorText: { color: C.brand.red, fontSize: 15 },
+
+  empty: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    gap: 8,
+  },
+  emptyIcon: { fontSize: 56, marginBottom: 8 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: C.text },
+  emptyText: {
+    fontSize: 14,
+    color: C.textMuted,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginTop: 4,
+  },
+
   list: { padding: 16, gap: 10 },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: C.surface,
     borderRadius: 14,
     flexDirection: 'row',
     overflow: 'hidden',
-    shadowColor: '#000',
+    shadowColor: C.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 6,
     elevation: 2,
   },
   cardUrgent: {
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.12,
     shadowRadius: 10,
     elevation: 4,
   },
@@ -146,8 +157,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   typText: { fontSize: 13, fontWeight: '700' },
-  poznamka: { fontSize: 12, color: '#888' },
-  denText: { fontSize: 15, fontWeight: '700', color: '#333' },
-  denUrgent: { color: '#2E7D32' },
-  datumText: { fontSize: 12, color: '#AAAAAA', marginTop: 2 },
+  poznamka: { fontSize: 12, color: C.textMuted },
+  denText: { fontSize: 15, fontWeight: '700', color: C.text },
+  denUrgent: { color: C.primary },
+  datumText: { fontSize: 12, color: C.textPlaceholder, marginTop: 2 },
 })

@@ -1,3 +1,5 @@
+import { AppHeader } from '@/components/AppHeader'
+import { C } from '@/constants/colors'
 import { supabase } from '@/src/lib/supabase'
 import { useState } from 'react'
 import {
@@ -78,13 +80,10 @@ export default function PrenajomScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <StatusBar barStyle="dark-content" backgroundColor={C.surface} />
       <ScrollView showsVerticalScrollIndicator={false}>
 
-        <View style={styles.header}>
-          <Text style={styles.sectionTitle}>Prenájom haly</Text>
-          <Text style={styles.headerSub}>Športová hala Výčapy-Opatovce</Text>
-        </View>
+        <AppHeader title="Prenájom haly" subtitle="Športová hala Výčapy-Opatovce" />
 
         {/* INFO KARTA */}
         <View style={styles.infoKarta}>
@@ -129,45 +128,45 @@ export default function PrenajomScreen() {
           <Text style={styles.sectionLabel}>Kontaktné údaje</Text>
 
           <Text style={styles.label}>Meno a priezvisko *</Text>
-          <TextInput style={styles.input} placeholder="Ján Novák" placeholderTextColor="#BBB"
+          <TextInput style={styles.input} placeholder="Ján Novák" placeholderTextColor={C.textPlaceholder}
             value={meno} onChangeText={setMeno} />
 
           <Text style={styles.label}>Email *</Text>
-          <TextInput style={styles.input} placeholder="jan.novak@email.sk" placeholderTextColor="#BBB"
+          <TextInput style={styles.input} placeholder="jan.novak@email.sk" placeholderTextColor={C.textPlaceholder}
             value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
 
           <Text style={styles.label}>Telefón *</Text>
-          <TextInput style={styles.input} placeholder="+421 900 000 000" placeholderTextColor="#BBB"
+          <TextInput style={styles.input} placeholder="+421 900 000 000" placeholderTextColor={C.textPlaceholder}
             value={telefon} onChangeText={setTelefon} keyboardType="phone-pad" />
 
           {/* TERMÍN */}
           <Text style={styles.sectionLabel}>Termín prenájmu</Text>
 
           <Text style={styles.label}>Dátum * (RRRR-MM-DD)</Text>
-          <TextInput style={styles.input} placeholder="napr. 2026-06-15" placeholderTextColor="#BBB"
+          <TextInput style={styles.input} placeholder="napr. 2026-06-15" placeholderTextColor={C.textPlaceholder}
             value={datum} onChangeText={setDatum} />
 
           <View style={styles.casRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.label}>Od *</Text>
-              <TextInput style={styles.input} placeholder="08:00" placeholderTextColor="#BBB"
+              <TextInput style={styles.input} placeholder="08:00" placeholderTextColor={C.textPlaceholder}
                 value={casOd} onChangeText={setCasOd} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.label}>Do *</Text>
-              <TextInput style={styles.input} placeholder="10:00" placeholderTextColor="#BBB"
+              <TextInput style={styles.input} placeholder="10:00" placeholderTextColor={C.textPlaceholder}
                 value={casDo} onChangeText={setCasDo} />
             </View>
           </View>
 
           <Text style={styles.label}>Počet osôb</Text>
-          <TextInput style={styles.input} placeholder="napr. 30" placeholderTextColor="#BBB"
+          <TextInput style={styles.input} placeholder="napr. 30" placeholderTextColor={C.textPlaceholder}
             value={pocetOsob} onChangeText={setPocetOsob} keyboardType="number-pad" />
 
           <Text style={styles.label}>Poznámka</Text>
           <TextInput style={[styles.input, { height: 100 }]}
             placeholder="Doplňujúce informácie..."
-            placeholderTextColor="#BBB"
+            placeholderTextColor={C.textPlaceholder}
             value={poznamka} onChangeText={setPoznamka}
             multiline textAlignVertical="top" />
 
@@ -178,7 +177,7 @@ export default function PrenajomScreen() {
             activeOpacity={0.8}
           >
             {loading
-              ? <ActivityIndicator color="#fff" />
+              ? <ActivityIndicator color={C.onPrimary} />
               : <Text style={styles.submitBtnText}>Odoslať žiadosť o prenájom</Text>
             }
           </TouchableOpacity>
@@ -193,54 +192,49 @@ export default function PrenajomScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F7F8FA' },
-  header: {
-    backgroundColor: '#fff', paddingHorizontal: 20,
-    paddingTop: 16, paddingBottom: 20,
-    borderBottomWidth: 1, borderBottomColor: '#EEEEEE',
-  },
-  sectionTitle: { fontSize: 24, fontWeight: '800', color: '#1A1A1A', letterSpacing: -0.5 },
-  headerSub: { fontSize: 13, color: '#888', marginTop: 4 },
+  safe: { flex: 1, backgroundColor: C.background },
   infoKarta: {
-    backgroundColor: '#E8F5E9', margin: 16, borderRadius: 14,
+    backgroundColor: C.secondaryLight, margin: 16, borderRadius: 14,
     padding: 16, gap: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: C.secondary,
   },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   infoEmoji: { fontSize: 16 },
-  infoText: { fontSize: 14, color: '#2E7D32', fontWeight: '500' },
+  infoText: { fontSize: 14, color: C.secondaryDark, fontWeight: '500' },
   content: { padding: 16, gap: 4 },
   sectionLabel: {
-    fontSize: 16, fontWeight: '800', color: '#1A1A1A',
+    fontSize: 16, fontWeight: '800', color: C.text,
     marginTop: 16, marginBottom: 8,
   },
-  label: { fontSize: 13, fontWeight: '700', color: '#444', marginBottom: 8, marginTop: 8 },
+  label: { fontSize: 13, fontWeight: '700', color: C.textSecondary, marginBottom: 8, marginTop: 8 },
   ucelyGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   ucelBtn: {
     borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10,
-    backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#E0E0E0',
+    backgroundColor: C.surface, borderWidth: 1.5, borderColor: C.border,
   },
-  ucelBtnActive: { borderColor: '#2E7D32', backgroundColor: '#E8F5E9' },
-  ucelBtnText: { fontSize: 13, fontWeight: '600', color: '#555' },
-  ucelBtnTextActive: { color: '#2E7D32' },
+  ucelBtnActive: { borderColor: C.primary, backgroundColor: C.primaryLight },
+  ucelBtnText: { fontSize: 13, fontWeight: '600', color: C.textSecondary },
+  ucelBtnTextActive: { color: C.primary, fontWeight: '700' },
   input: {
-    backgroundColor: '#fff', borderRadius: 12,
-    borderWidth: 1.5, borderColor: '#E0E0E0',
-    padding: 14, fontSize: 15, color: '#1A1A1A',
+    backgroundColor: C.surface, borderRadius: 12,
+    borderWidth: 1.5, borderColor: C.border,
+    padding: 14, fontSize: 15, color: C.text,
   },
   casRow: { flexDirection: 'row', gap: 12 },
   submitBtn: {
-    backgroundColor: '#2E7D32', borderRadius: 14,
+    backgroundColor: C.primary, borderRadius: 14,
     padding: 18, alignItems: 'center', marginTop: 16,
   },
-  submitBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  disclaimer: { fontSize: 12, color: '#AAAAAA', textAlign: 'center', marginTop: 8, lineHeight: 18 },
+  submitBtnText: { color: C.onPrimary, fontSize: 16, fontWeight: '700' },
+  disclaimer: { fontSize: 12, color: C.textPlaceholder, textAlign: 'center', marginTop: 8, lineHeight: 18 },
   successContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, gap: 16 },
   successEmoji: { fontSize: 64 },
-  successTitle: { fontSize: 24, fontWeight: '800', color: '#1A1A1A' },
-  successText: { fontSize: 15, color: '#555', textAlign: 'center', lineHeight: 22 },
+  successTitle: { fontSize: 24, fontWeight: '800', color: C.text },
+  successText: { fontSize: 15, color: C.textSecondary, textAlign: 'center', lineHeight: 22 },
   resetBtn: {
-    backgroundColor: '#2E7D32', borderRadius: 14,
+    backgroundColor: C.secondary, borderRadius: 14,
     paddingHorizontal: 32, paddingVertical: 16, marginTop: 8,
   },
-  resetBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  resetBtnText: { color: C.onPrimary, fontSize: 15, fontWeight: '700' },
 })

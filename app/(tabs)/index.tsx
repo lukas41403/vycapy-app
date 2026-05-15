@@ -1,5 +1,7 @@
-import { useAktuality } from '@/src/hooks/useAktuality';
-import { useRouter } from 'expo-router';
+import { AppHeader } from '@/components/AppHeader'
+import { C } from '@/constants/colors'
+import { useAktuality } from '@/src/hooks/useAktuality'
+import { useRouter } from 'expo-router'
 import {
   ActivityIndicator,
   FlatList,
@@ -9,15 +11,15 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from 'react-native'
 
 const KATEGORIA_FARBY: Record<string, { bg: string; text: string }> = {
-  oznam:      { bg: '#E3F2FD', text: '#1565C0' },
-  akcia:      { bg: '#E8F5E9', text: '#2E7D32' },
-  uzavierka:  { bg: '#FFF3E0', text: '#E65100' },
-  vypadok:    { bg: '#FFEBEE', text: '#C62828' },
-  sport:      { bg: '#F3E5F5', text: '#6A1B9A' },
-  ine:        { bg: '#ECEFF1', text: '#37474F' },
+  oznam:     C.status.info,
+  akcia:     C.status.success,
+  uzavierka: { bg: '#FFF3E0', text: '#E65100' },
+  vypadok:   C.status.danger,
+  sport:     C.status.accent,
+  ine:       C.status.neutral,
 }
 
 const KATEGORIA_LABEL: Record<string, string> = {
@@ -31,24 +33,18 @@ export default function AktualityScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <StatusBar barStyle="light-content" backgroundColor={C.primary} />
 
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View style={styles.logoBadge}>
-            <Text style={styles.logoText}>V–O</Text>
-          </View>
-          <View>
-            <Text style={styles.headerTitle}>Výčapy-Opatovce</Text>
-            <Text style={styles.headerSub}>Obecná aplikácia</Text>
-          </View>
-        </View>
-        <Text style={styles.sectionTitle}>Aktuality</Text>
-      </View>
+      <AppHeader
+        variant="brand"
+        showBrandRow
+        title="Aktuality"
+        subtitle="Čo nové v obci"
+      />
 
       {loading && (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#2E7D32" />
+          <ActivityIndicator size="large" color={C.primary} />
           <Text style={styles.loadingText}>Načítavam...</Text>
         </View>
       )}
@@ -61,10 +57,12 @@ export default function AktualityScreen() {
       )}
 
       {!loading && !error && aktuality.length === 0 && (
-        <View style={styles.center}>
+        <View style={styles.empty}>
           <Text style={styles.emptyIcon}>📭</Text>
           <Text style={styles.emptyTitle}>Žiadne aktuality</Text>
-          <Text style={styles.emptyText}>Momentálne nie sú žiadne aktuality.</Text>
+          <Text style={styles.emptyText}>
+            Momentálne nie sú zverejnené žiadne aktuality. Pozrite sa neskôr.
+          </Text>
         </View>
       )}
 
@@ -113,43 +111,35 @@ export default function AktualityScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F7F8FA' },
-  header: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
-  },
-  headerTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 20,
-  },
-  logoBadge: {
-    width: 44, height: 44, borderRadius: 12,
-    backgroundColor: '#2E7D32',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  logoText: { color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 1 },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: '#1A1A1A' },
-  headerSub: { fontSize: 12, color: '#888', marginTop: 1 },
-  sectionTitle: { fontSize: 24, fontWeight: '800', color: '#1A1A1A', letterSpacing: -0.5 },
+  safe: { flex: 1, backgroundColor: C.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8 },
-  loadingText: { color: '#888', fontSize: 14, marginTop: 8 },
+  loadingText: { color: C.textMuted, fontSize: 14, marginTop: 8 },
   errorIcon: { fontSize: 36 },
-  errorText: { color: '#C62828', fontSize: 15 },
-  emptyIcon: { fontSize: 48, marginBottom: 8 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#333' },
-  emptyText: { fontSize: 14, color: '#888' },
+  errorText: { color: C.brand.red, fontSize: 15 },
+
+  empty: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    gap: 8,
+  },
+  emptyIcon: { fontSize: 56, marginBottom: 8 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: C.text },
+  emptyText: {
+    fontSize: 14,
+    color: C.textMuted,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginTop: 4,
+  },
+
   list: { padding: 16, gap: 12 },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: C.surface,
     borderRadius: 16,
     padding: 18,
-    shadowColor: '#000',
+    shadowColor: C.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
@@ -163,9 +153,15 @@ const styles = StyleSheet.create({
   },
   badge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
   badgeText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
-  datum: { fontSize: 12, color: '#AAAAAA' },
-  cardTitle: { fontSize: 17, fontWeight: '700', color: '#1A1A1A', lineHeight: 24, marginBottom: 6 },
-  cardPerex: { fontSize: 14, color: '#555', lineHeight: 21, marginBottom: 12 },
-  cardFooter: { borderTopWidth: 1, borderTopColor: '#F0F0F0', paddingTop: 10 },
-  readMore: { fontSize: 13, fontWeight: '600', color: '#2E7D32' },
+  datum: { fontSize: 12, color: C.textPlaceholder },
+  cardTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: C.text,
+    lineHeight: 24,
+    marginBottom: 6,
+  },
+  cardPerex: { fontSize: 14, color: C.textSecondary, lineHeight: 21, marginBottom: 12 },
+  cardFooter: { borderTopWidth: 1, borderTopColor: C.divider, paddingTop: 10 },
+  readMore: { fontSize: 13, fontWeight: '700', color: C.primary },
 })

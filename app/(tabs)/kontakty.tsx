@@ -1,3 +1,5 @@
+import { AppHeader } from '@/components/AppHeader'
+import { C } from '@/constants/colors'
 import {
     Linking, SafeAreaView, ScrollView,
     StatusBar, StyleSheet, Text,
@@ -51,24 +53,21 @@ const KONTAKTY = [
 
 const URADNE_HODINY = [
   { den: 'Pondelok', cas: '07:30 – 12:00 | 12:30 – 16:00' },
-  { den: 'Utorok', cas: '07:30 – 12:00 | 12:30 – 15:30' },
-  { den: 'Streda', cas: '07:30 – 12:00 | 12:30 – 17:00' },
-  { den: 'Štvrtok', cas: 'Nestránkový deň' },
-  { den: 'Piatok', cas: '07:30 – 12:00' },
+  { den: 'Utorok',   cas: '07:30 – 12:00 | 12:30 – 15:30' },
+  { den: 'Streda',   cas: '07:30 – 12:00 | 12:30 – 17:00' },
+  { den: 'Štvrtok',  cas: 'Nestránkový deň' },
+  { den: 'Piatok',   cas: '07:30 – 12:00' },
 ]
 
 export default function KontaktyScreen() {
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <StatusBar barStyle="dark-content" backgroundColor={C.surface} />
       <ScrollView showsVerticalScrollIndicator={false}>
 
-        <View style={styles.header}>
-          <Text style={styles.sectionTitle}>Kontakty</Text>
-          <Text style={styles.headerSub}>Obecný úrad Výčapy-Opatovce</Text>
-        </View>
+        <AppHeader title="Kontakty" subtitle="Obecný úrad Výčapy-Opatovce" />
 
-        {/* ADRESA */}
+        {/* ADRESA — brandová karta s farbou obce */}
         <View style={styles.adresaKarta}>
           <View style={styles.adresaRow}>
             <Text style={styles.adresaEmoji}>📍</Text>
@@ -96,7 +95,7 @@ export default function KontaktyScreen() {
           <Text style={styles.seklabel}>🕐 Úradné hodiny</Text>
           <View style={styles.hodinyKarta}>
             {URADNE_HODINY.map((h, i) => {
-              const jeStvrток = h.den === 'Štvrtok'
+              const jeStvrtok = h.den === 'Štvrtok'
               const jeDnes = new Date().toLocaleDateString('sk-SK', { weekday: 'long' })
                 .toLowerCase() === h.den.toLowerCase()
               return (
@@ -106,11 +105,11 @@ export default function KontaktyScreen() {
                   jeDnes && styles.hodinyRowDnes,
                 ]}>
                   <Text style={[styles.hodinyDen, jeDnes && styles.hodinyDenDnes]}>
-                    {h.den} {jeDnes && '← dnes'}
+                    {h.den}{jeDnes && ' ← dnes'}
                   </Text>
                   <Text style={[
-                    styles.hodinyČas,
-                    jeStvrток && styles.hodinyStvrток,
+                    styles.hodinyCas,
+                    jeStvrtok && styles.hodinyStvrtok,
                     jeDnes && styles.hodinyDenDnes,
                   ]}>
                     {h.cas}
@@ -137,7 +136,7 @@ export default function KontaktyScreen() {
                 {k.telefon && (
                   <TouchableOpacity
                     style={styles.kontaktBtn}
-                    onPress={() => Linking.openURL(`tel:${k.telefon.replace(/\s/g, '')}`)}
+                    onPress={() => Linking.openURL(`tel:${k.telefon!.replace(/\s/g, '')}`)}
                   >
                     <Text style={styles.kontaktBtnText}>📞 {k.telefon}</Text>
                   </TouchableOpacity>
@@ -161,30 +160,29 @@ export default function KontaktyScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F7F8FA' },
-  header: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20,
-    borderBottomWidth: 1, borderBottomColor: '#EEEEEE',
-  },
-  sectionTitle: { fontSize: 24, fontWeight: '800', color: '#1A1A1A', letterSpacing: -0.5 },
-  headerSub: { fontSize: 13, color: '#888', marginTop: 4 },
+  safe: { flex: 1, backgroundColor: C.background },
 
+  // Adresová karta — brandová červená pre maximálnu identifikáciu
   adresaKarta: {
-    backgroundColor: '#1B5E20', margin: 16, borderRadius: 16,
+    backgroundColor: C.primary, margin: 16, borderRadius: 16,
     padding: 18, gap: 12,
+    shadowColor: C.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   adresaRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   adresaEmoji: { fontSize: 18, width: 24 },
-  adresaText: { fontSize: 14, color: 'rgba(255,255,255,0.9)', lineHeight: 20 },
-  adresaLink: { fontSize: 14, color: '#fff', fontWeight: '600', textDecorationLine: 'underline' },
+  adresaText: { fontSize: 14, color: 'rgba(255,255,255,0.92)', lineHeight: 20 },
+  adresaLink: { fontSize: 14, color: C.onPrimary, fontWeight: '700', textDecorationLine: 'underline' },
 
   sekcia: { paddingHorizontal: 16, marginBottom: 16 },
-  seklabel: { fontSize: 16, fontWeight: '800', color: '#1A1A1A', marginBottom: 10 },
+  seklabel: { fontSize: 16, fontWeight: '800', color: C.text, marginBottom: 10 },
 
   hodinyKarta: {
-    backgroundColor: '#fff', borderRadius: 14,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    backgroundColor: C.surface, borderRadius: 14,
+    shadowColor: C.shadow, shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
     overflow: 'hidden',
   },
@@ -192,30 +190,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', padding: 14,
   },
-  hodinyRowBorder: { borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
-  hodinyRowDnes: { backgroundColor: '#E8F5E9' },
-  hodinyDen: { fontSize: 14, fontWeight: '600', color: '#333' },
-  hodinyDenDnes: { color: '#2E7D32' },
-  hodinyČas: { fontSize: 13, color: '#555' },
-  hodinyStvrток: { color: '#C62828', fontStyle: 'italic' },
+  hodinyRowBorder: { borderBottomWidth: 1, borderBottomColor: C.divider },
+  hodinyRowDnes: { backgroundColor: C.accentLight },
+  hodinyDen: { fontSize: 14, fontWeight: '600', color: C.text },
+  hodinyDenDnes: { color: C.accentDark, fontWeight: '800' },
+  hodinyCas: { fontSize: 13, color: C.textSecondary },
+  hodinyStvrtok: { color: C.brand.red, fontStyle: 'italic' },
 
   kontaktKarta: {
-    backgroundColor: '#fff', borderRadius: 14, padding: 16,
+    backgroundColor: C.surface, borderRadius: 14, padding: 16,
     marginBottom: 10,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowColor: C.shadow, shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
   },
   kontaktHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
   kontaktEmoji: { fontSize: 32 },
   kontaktInfo: { flex: 1 },
-  kontaktMeno: { fontSize: 15, fontWeight: '700', color: '#1A1A1A' },
-  kontaktFunkcia: { fontSize: 13, color: '#888', marginTop: 2 },
+  kontaktMeno: { fontSize: 15, fontWeight: '700', color: C.text },
+  kontaktFunkcia: { fontSize: 13, color: C.textMuted, marginTop: 2 },
   kontaktAkcie: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   kontaktBtn: {
-    backgroundColor: '#E8F5E9', borderRadius: 8,
+    backgroundColor: C.secondaryLight, borderRadius: 8,
     paddingHorizontal: 14, paddingVertical: 8,
   },
-  kontaktBtnEmail: { backgroundColor: '#E3F2FD' },
-  kontaktBtnText: { fontSize: 13, fontWeight: '600', color: '#2E7D32' },
-  kontaktBtnEmailText: { color: '#1565C0' },
+  kontaktBtnEmail: { backgroundColor: C.status.info.bg },
+  kontaktBtnText: { fontSize: 13, fontWeight: '700', color: C.secondary },
+  kontaktBtnEmailText: { color: C.status.info.fg },
 })

@@ -1,9 +1,12 @@
+import { ErbBadge } from '@/components/AppHeader'
+import { C } from '@/constants/colors'
 import { supabase } from '@/src/lib/supabase'
 import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import {
     ActivityIndicator,
     Alert,
+    Linking,
     SafeAreaView,
     ScrollView,
     StatusBar,
@@ -38,11 +41,51 @@ type AktualitaItem = {
   kategoria: string
 }
 
+type PrenajomZiadost = {
+  id: string
+  meno: string
+  email: string
+  telefon: string
+  datum: string
+  cas_od: string
+  cas_do: string
+  ucel: string
+  pocet_osob: number | null
+  poznamka: string | null
+  status: string | null
+  created_at: string
+}
+
+const PRENAJOM_STATUS: Record<string, { bg: string; text: string; label: string }> = {
+  nove:       { bg: C.status.info.bg,    text: C.status.info.fg,    label: 'Nové' },
+  schvalene:  { bg: C.status.success.bg, text: C.status.success.fg, label: 'Schválené' },
+  zamietnute: { bg: C.status.danger.bg,  text: C.status.danger.fg,  label: 'Zamietnuté' },
+}
+
+const UCEL_LABEL: Record<string, string> = {
+  sport: '⚽ Šport / tréning',
+  kultura: '🎭 Kultúrna akcia',
+  oslava: '🎉 Oslava / party',
+  firemne: '💼 Firemné podujatie',
+  ine: '📋 Iné',
+}
+
 const STATUS_FARBY: Record<string, { bg: string; text: string; label: string }> = {
-  nove:       { bg: '#E3F2FD', text: '#1565C0', label: 'Nové' },
-  v_rieseni:  { bg: '#FFF8E1', text: '#F57F17', label: 'V riešení' },
-  vyriesene:  { bg: '#E8F5E9', text: '#2E7D32', label: 'Vyriešené' },
-  zamietnute: { bg: '#FFEBEE', text: '#C62828', label: 'Zamietnuté' },
+  nove:       { ...C.status.info,    label: 'Nové' },
+  v_rieseni:  { ...C.status.warning, label: 'V riešení' },
+  vyriesene:  { ...C.status.success, label: 'Vyriešené' },
+  zamietnute: { ...C.status.danger,  label: 'Zamietnuté' },
+}
+
+// status objekt používa { bg, fg } v C.status — premapujeme tu na { bg, text }
+function statusInfoFor(status: string) {
+  const map: Record<string, { bg: string; text: string; label: string }> = {
+    nove:       { bg: C.status.info.bg,    text: C.status.info.fg,    label: 'Nové' },
+    v_rieseni:  { bg: C.status.warning.bg, text: C.status.warning.fg, label: 'V riešení' },
+    vyriesene:  { bg: C.status.success.bg, text: C.status.success.fg, label: 'Vyriešené' },
+    zamietnute: { bg: C.status.danger.bg,  text: C.status.danger.fg,  label: 'Zamietnuté' },
+  }
+  return map[status] ?? map.nove
 }
 
 const KATEGORIA_EMOJI: Record<string, string> = {
@@ -67,21 +110,28 @@ const PODUJATIE_KATEGORIE = [
 ]
 
 export default function AdminScreen() {
-  const [aktTab, setAktTab] = useState<'hlasenia' | 'aktuality' | 'podujatia'>('hlasenia')
+  const [aktTab, setAktTab] = useState<'hlasenia' | 'aktuality' | 'podujatia' | 'prenajmy'>('hlasenia')
   const [hlasenia, setHlasenia] = useState<Hlasenie[]>([])
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
+  // Auth gating — kým neoveríme session, render nič, aby admin obsah nikdy
+  // neflikol pred redirectom na login.
+  const [authChecked, setAuthChecked] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) router.replace('/admin-login')
+      if (!session) {
+        router.replace('/admin-login')
+      } else {
+        setAuthChecked(true)
+      }
     })
-  }, [])
+  }, [router])
 
   useEffect(() => {
-    nacitajHlasenia()
-  }, [])
+    if (authChecked) nacitajHlasenia()
+  }, [authChecked])
 
   async function nacitajHlasenia() {
     setLoading(true)
@@ -109,16 +159,27 @@ export default function AdminScreen() {
     setUpdating(null)
   }
 
+  // Pred overením session nezobrazíme nič, aby nikto nevidel admin obsah
+  if (!authChecked) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={C.primary} />
+        </View>
+      </SafeAreaView>
+    )
+  }
+
   const nove = hlasenia.filter(h => h.status === 'nove')
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor="#1B5E20" />
+      <StatusBar barStyle="light-content" backgroundColor={C.primary} />
 
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.logoBadge}>
-            <Text style={styles.logoText}>V–O</Text>
+            <ErbBadge variant="brand" />
           </View>
           <View>
             <Text style={styles.headerTitle}>Admin panel</Text>
@@ -141,15 +202,21 @@ export default function AdminScreen() {
           style={[styles.tab, aktTab === 'hlasenia' && styles.tabActive]}
           onPress={() => setAktTab('hlasenia')}
         >
-          <Text style={[styles.tabText, aktTab === 'hlasenia' && styles.tabTextActive]}>
-            ⚠️ Hlásenia {nove.length > 0 && `(${nove.length})`}
+          <Text
+            style={[styles.tabText, aktTab === 'hlasenia' && styles.tabTextActive]}
+            numberOfLines={1}
+          >
+            ⚠️ Hlásenia{nove.length > 0 ? ` (${nove.length})` : ''}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, aktTab === 'aktuality' && styles.tabActive]}
           onPress={() => setAktTab('aktuality')}
         >
-          <Text style={[styles.tabText, aktTab === 'aktuality' && styles.tabTextActive]}>
+          <Text
+            style={[styles.tabText, aktTab === 'aktuality' && styles.tabTextActive]}
+            numberOfLines={1}
+          >
             📰 Aktuality
           </Text>
         </TouchableOpacity>
@@ -157,8 +224,22 @@ export default function AdminScreen() {
           style={[styles.tab, aktTab === 'podujatia' && styles.tabActive]}
           onPress={() => setAktTab('podujatia')}
         >
-          <Text style={[styles.tabText, aktTab === 'podujatia' && styles.tabTextActive]}>
+          <Text
+            style={[styles.tabText, aktTab === 'podujatia' && styles.tabTextActive]}
+            numberOfLines={1}
+          >
             📅 Podujatia
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, aktTab === 'prenajmy' && styles.tabActive]}
+          onPress={() => setAktTab('prenajmy')}
+        >
+          <Text
+            style={[styles.tabText, aktTab === 'prenajmy' && styles.tabTextActive]}
+            numberOfLines={1}
+          >
+            🏟️ Prenájmy
           </Text>
         </TouchableOpacity>
       </View>
@@ -166,7 +247,7 @@ export default function AdminScreen() {
       {aktTab === 'hlasenia' ? (
         loading ? (
           <View style={styles.center}>
-            <ActivityIndicator size="large" color="#2E7D32" />
+            <ActivityIndicator size="large" color={C.primary} />
           </View>
         ) : (
           <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
@@ -196,8 +277,10 @@ export default function AdminScreen() {
         )
       ) : aktTab === 'aktuality' ? (
         <NovAktualitaForm />
-      ) : (
+      ) : aktTab === 'podujatia' ? (
         <NovePodujatieForm />
+      ) : (
+        <PrenajmyZoznam />
       )}
     </SafeAreaView>
   )
@@ -303,14 +386,14 @@ function NovAktualitaForm() {
             </ScrollView>
             <Text style={styles.formLabel}>Titulok *</Text>
             <TextInput style={styles.input} placeholder="Titulok aktuality..."
-              placeholderTextColor="#BBB" value={title} onChangeText={setTitle} />
+              placeholderTextColor={C.textPlaceholder} value={title} onChangeText={setTitle} />
             <Text style={styles.formLabel}>Perex (krátky úvod)</Text>
             <TextInput style={[styles.input, { height: 80 }]}
-              placeholder="Krátky popis..." placeholderTextColor="#BBB"
+              placeholder="Krátky popis..." placeholderTextColor={C.textPlaceholder}
               value={perex} onChangeText={setPerex} multiline textAlignVertical="top" />
             <Text style={styles.formLabel}>Text aktuality *</Text>
             <TextInput style={[styles.input, { height: 160 }]}
-              placeholder="Celý text..." placeholderTextColor="#BBB"
+              placeholder="Celý text..." placeholderTextColor={C.textPlaceholder}
               value={body} onChangeText={setBody} multiline textAlignVertical="top" />
             <View style={styles.publikovatRow}>
               <Text style={styles.formLabel}>Publikovať ihneď</Text>
@@ -325,7 +408,7 @@ function NovAktualitaForm() {
               style={[styles.submitBtn, loading && { opacity: 0.6 }]}
               onPress={publikovatAktualitu} disabled={loading}
             >
-              {loading ? <ActivityIndicator color="#fff" />
+              {loading ? <ActivityIndicator color={C.onPrimary} />
                 : <Text style={styles.submitBtnText}>{publikovat ? '🚀 Publikovať' : '💾 Uložiť koncept'}</Text>}
             </TouchableOpacity>
           </View>
@@ -333,7 +416,7 @@ function NovAktualitaForm() {
       ) : (
         <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
           {nacitavam ? (
-            <ActivityIndicator size="large" color="#2E7D32" style={{ marginTop: 40 }} />
+            <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }} />
           ) : aktuality.map(a => (
             <View key={a.id} style={styles.karta}>
               <View style={styles.kartaHeader}>
@@ -343,8 +426,14 @@ function NovAktualitaForm() {
                   </Text>
                   <Text style={styles.kartaPopis} numberOfLines={2}>{a.title}</Text>
                 </View>
-                <View style={[styles.statusBadge, { backgroundColor: a.is_published ? '#E8F5E9' : '#FFF8E1' }]}>
-                  <Text style={[styles.statusText, { color: a.is_published ? '#2E7D32' : '#F57F17' }]}>
+                <View style={[
+                  styles.statusBadge,
+                  { backgroundColor: a.is_published ? C.status.success.bg : C.status.warning.bg }
+                ]}>
+                  <Text style={[
+                    styles.statusText,
+                    { color: a.is_published ? C.status.success.fg : C.status.warning.fg }
+                  ]}>
                     {a.is_published ? 'Pub.' : 'Koncept'}
                   </Text>
                 </View>
@@ -355,10 +444,10 @@ function NovAktualitaForm() {
                   : 'Nepublikovaná'}
               </Text>
               <TouchableOpacity
-                style={[styles.akciaBtn, { backgroundColor: '#FFEBEE', marginTop: 10, alignSelf: 'flex-start' }]}
+                style={[styles.akciaBtn, { backgroundColor: C.status.danger.bg, marginTop: 10, alignSelf: 'flex-start' }]}
                 onPress={() => zmazAktualitu(a.id)}
               >
-                <Text style={[styles.akciaBtnText, { color: '#C62828' }]}>🗑️ Zmazať</Text>
+                <Text style={[styles.akciaBtnText, { color: C.status.danger.fg }]}>🗑️ Zmazať</Text>
               </TouchableOpacity>
             </View>
           ))}
@@ -427,26 +516,26 @@ function NovePodujatieForm() {
         </ScrollView>
         <Text style={styles.formLabel}>Názov podujatia *</Text>
         <TextInput style={styles.input} placeholder="napr. Deň obce 2026"
-          placeholderTextColor="#BBB" value={title} onChangeText={setTitle} />
+          placeholderTextColor={C.textPlaceholder} value={title} onChangeText={setTitle} />
         <Text style={styles.formLabel}>Dátum * (RRRR-MM-DD)</Text>
         <TextInput style={styles.input} placeholder="napr. 2026-06-15"
-          placeholderTextColor="#BBB" value={datumOd} onChangeText={setDatumOd} />
+          placeholderTextColor={C.textPlaceholder} value={datumOd} onChangeText={setDatumOd} />
         <Text style={styles.formLabel}>Čas (HH:MM)</Text>
         <TextInput style={styles.input} placeholder="napr. 15:00"
-          placeholderTextColor="#BBB" value={cas} onChangeText={setCas} />
+          placeholderTextColor={C.textPlaceholder} value={cas} onChangeText={setCas} />
         <Text style={styles.formLabel}>Miesto</Text>
         <TextInput style={styles.input} placeholder="napr. Kultúrny dom"
-          placeholderTextColor="#BBB" value={miesto} onChangeText={setMiesto} />
+          placeholderTextColor={C.textPlaceholder} value={miesto} onChangeText={setMiesto} />
         <Text style={styles.formLabel}>Popis</Text>
         <TextInput style={[styles.input, { height: 100 }]}
           placeholder="Krátky popis podujatia..."
-          placeholderTextColor="#BBB" value={popis} onChangeText={setPopis}
+          placeholderTextColor={C.textPlaceholder} value={popis} onChangeText={setPopis}
           multiline textAlignVertical="top" />
         <TouchableOpacity
           style={[styles.submitBtn, loading && { opacity: 0.6 }]}
           onPress={ulozPodujatie} disabled={loading}
         >
-          {loading ? <ActivityIndicator color="#fff" />
+          {loading ? <ActivityIndicator color={C.onPrimary} />
             : <Text style={styles.submitBtnText}>📅 Pridať do kalendára</Text>}
         </TouchableOpacity>
       </View>
@@ -454,12 +543,267 @@ function NovePodujatieForm() {
   )
 }
 
+function PrenajmyZoznam() {
+  const [ziadosti, setZiadosti] = useState<PrenajomZiadost[]>([])
+  const [loading, setLoading] = useState(true)
+  const [updating, setUpdating] = useState<string | null>(null)
+  const [chyba, setChyba] = useState<string | null>(null)
+
+  useEffect(() => {
+    nacitaj()
+  }, [])
+
+  async function nacitaj() {
+    setLoading(true)
+    setChyba(null)
+    const { data, error } = await supabase
+      .from('prenajom_haly')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      // Najčastejšie: stĺpec `status` ešte v tabuľke neexistuje
+      setChyba(error.message)
+      setZiadosti([])
+    } else {
+      setZiadosti((data as PrenajomZiadost[]) || [])
+    }
+    setLoading(false)
+  }
+
+  async function zmenStatus(id: string, novyStatus: string) {
+    setUpdating(id)
+    const { error } = await supabase
+      .from('prenajom_haly')
+      .update({ status: novyStatus })
+      .eq('id', id)
+    if (error) {
+      Alert.alert('Chyba', 'Stav sa nepodarilo zmeniť.\n\n' + error.message)
+    } else {
+      await nacitaj()
+    }
+    setUpdating(null)
+  }
+
+  function statusOf(z: PrenajomZiadost) {
+    return PRENAJOM_STATUS[z.status || 'nove'] ?? PRENAJOM_STATUS.nove
+  }
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={C.primary} />
+      </View>
+    )
+  }
+
+  if (chyba) {
+    return (
+      <View style={[styles.list, { gap: 12 }]}>
+        <View style={[styles.formCard, { borderLeftWidth: 4, borderLeftColor: C.primary }]}>
+          <Text style={[styles.formLabel, { color: C.primary }]}>Nepodarilo sa načítať prenájmy</Text>
+          <Text style={{ fontSize: 13, color: C.textSecondary, lineHeight: 19 }}>{chyba}</Text>
+          <Text style={{ fontSize: 12, color: C.textMuted, marginTop: 8, lineHeight: 18 }}>
+            Tip: skontrolujte, či má tabuľka prenajom_haly stĺpec status (text, default &apos;nove&apos;).
+          </Text>
+          <TouchableOpacity style={[styles.submitBtn, { marginTop: 12 }]} onPress={nacitaj}>
+            <Text style={styles.submitBtnText}>Skúsiť znova</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    )
+  }
+
+  const nove = ziadosti.filter(z => (z.status || 'nove') === 'nove')
+  const ostatne = ziadosti.filter(z => (z.status || 'nove') !== 'nove')
+
+  return (
+    <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+      {nove.length > 0 && (
+        <>
+          <Text style={styles.sekcia}>🔴 Nové žiadosti ({nove.length})</Text>
+          {nove.map(z => (
+            <PrenajomKarta
+              key={z.id}
+              ziadost={z}
+              statusInfo={statusOf(z)}
+              updating={updating === z.id}
+              onZmenStatus={zmenStatus}
+            />
+          ))}
+        </>
+      )}
+      {ostatne.length > 0 && (
+        <>
+          <Text style={[styles.sekcia, { marginTop: 8 }]}>📋 Spracované žiadosti</Text>
+          {ostatne.map(z => (
+            <PrenajomKarta
+              key={z.id}
+              ziadost={z}
+              statusInfo={statusOf(z)}
+              updating={updating === z.id}
+              onZmenStatus={zmenStatus}
+            />
+          ))}
+        </>
+      )}
+      {ziadosti.length === 0 && (
+        <View style={styles.empty}>
+          <Text style={styles.emptyEmoji}>🏟️</Text>
+          <Text style={styles.emptyText}>Žiadne žiadosti o prenájom</Text>
+        </View>
+      )}
+    </ScrollView>
+  )
+}
+
+function PrenajomKarta({
+  ziadost: z,
+  statusInfo,
+  updating,
+  onZmenStatus,
+}: {
+  ziadost: PrenajomZiadost
+  statusInfo: { bg: string; text: string; label: string }
+  updating: boolean
+  onZmenStatus: (id: string, status: string) => void
+}) {
+  const datumPrenajmu = new Date(z.datum).toLocaleDateString('sk-SK', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  })
+  const datumPrijatia = new Date(z.created_at).toLocaleDateString('sk-SK', {
+    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+  })
+  const aktStatus = z.status || 'nove'
+
+  return (
+    <View style={styles.karta}>
+      <View style={styles.kartaHeader}>
+        <View style={styles.kartaInfo}>
+          <Text style={styles.kartaKategoria}>{UCEL_LABEL[z.ucel] ?? z.ucel}</Text>
+          <Text style={styles.kartaPopis} numberOfLines={1}>{z.meno}</Text>
+        </View>
+        <View style={[styles.statusBadge, { backgroundColor: statusInfo.bg }]}>
+          <Text style={[styles.statusText, { color: statusInfo.text }]}>{statusInfo.label}</Text>
+        </View>
+      </View>
+
+      <View style={prenajomStyles.detailGrid}>
+        <View style={prenajomStyles.detailRow}>
+          <Text style={prenajomStyles.detailIcon}>📅</Text>
+          <Text style={prenajomStyles.detailText}>
+            {datumPrenajmu.charAt(0).toUpperCase() + datumPrenajmu.slice(1)}
+          </Text>
+        </View>
+        <View style={prenajomStyles.detailRow}>
+          <Text style={prenajomStyles.detailIcon}>⏰</Text>
+          <Text style={prenajomStyles.detailText}>{z.cas_od} – {z.cas_do}</Text>
+        </View>
+        {z.pocet_osob != null && (
+          <View style={prenajomStyles.detailRow}>
+            <Text style={prenajomStyles.detailIcon}>👥</Text>
+            <Text style={prenajomStyles.detailText}>{z.pocet_osob} osôb</Text>
+          </View>
+        )}
+      </View>
+
+      {z.poznamka && (
+        <Text style={prenajomStyles.poznamka}>„{z.poznamka}"</Text>
+      )}
+
+      <View style={prenajomStyles.kontakty}>
+        <TouchableOpacity
+          style={prenajomStyles.kontaktBtn}
+          onPress={() => Linking.openURL(`tel:${z.telefon.replace(/\s/g, '')}`)}
+        >
+          <Text style={prenajomStyles.kontaktBtnText}>📞 {z.telefon}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[prenajomStyles.kontaktBtn, prenajomStyles.kontaktBtnEmail]}
+          onPress={() => Linking.openURL(`mailto:${z.email}`)}
+        >
+          <Text style={[prenajomStyles.kontaktBtnText, prenajomStyles.kontaktBtnEmailText]}>
+            ✉️ {z.email}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <Text style={prenajomStyles.prijate}>Prijaté: {datumPrijatia}</Text>
+
+      {updating ? (
+        <ActivityIndicator size="small" color={C.primary} style={{ marginTop: 12 }} />
+      ) : (
+        <View style={styles.akcie}>
+          {aktStatus !== 'schvalene' && (
+            <TouchableOpacity
+              style={[styles.akciaBtn, { backgroundColor: C.status.success.bg }]}
+              onPress={() => onZmenStatus(z.id, 'schvalene')}
+            >
+              <Text style={[styles.akciaBtnText, { color: C.status.success.fg }]}>Schváliť ✓</Text>
+            </TouchableOpacity>
+          )}
+          {aktStatus !== 'zamietnute' && (
+            <TouchableOpacity
+              style={[styles.akciaBtn, { backgroundColor: C.status.danger.bg }]}
+              onPress={() => onZmenStatus(z.id, 'zamietnute')}
+            >
+              <Text style={[styles.akciaBtnText, { color: C.status.danger.fg }]}>Zamietnuť</Text>
+            </TouchableOpacity>
+          )}
+          {aktStatus !== 'nove' && (
+            <TouchableOpacity
+              style={[styles.akciaBtn, { backgroundColor: C.status.info.bg }]}
+              onPress={() => onZmenStatus(z.id, 'nove')}
+            >
+              <Text style={[styles.akciaBtnText, { color: C.status.info.fg }]}>Označiť ako nové</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+    </View>
+  )
+}
+
+const prenajomStyles = StyleSheet.create({
+  detailGrid: {
+    gap: 6,
+    marginTop: 4,
+    marginBottom: 10,
+  },
+  detailRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  detailIcon: { fontSize: 14, width: 18 },
+  detailText: { fontSize: 13, color: C.textSecondary, fontWeight: '500' },
+  poznamka: {
+    fontSize: 13,
+    color: C.textSecondary,
+    fontStyle: 'italic',
+    lineHeight: 19,
+    backgroundColor: C.surfaceAlt,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+  },
+  kontakty: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 8 },
+  kontaktBtn: {
+    backgroundColor: C.secondaryLight,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  kontaktBtnEmail: { backgroundColor: C.status.info.bg },
+  kontaktBtnText: { fontSize: 12, fontWeight: '700', color: C.secondary },
+  kontaktBtnEmailText: { color: C.status.info.fg },
+  prijate: {
+    fontSize: 11, color: C.textPlaceholder, marginTop: 2,
+  },
+})
+
 function HlasenieKarta({ hlasenie: h, updating, onZmenStatus }: {
   hlasenie: Hlasenie
   updating: boolean
   onZmenStatus: (id: string, status: string) => void
 }) {
-  const statusInfo = STATUS_FARBY[h.status] ?? STATUS_FARBY.nove
+  const statusInfo = statusInfoFor(h.status)
   const datum = new Date(h.created_at).toLocaleDateString('sk-SK', {
     day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
   })
@@ -479,22 +823,22 @@ function HlasenieKarta({ hlasenie: h, updating, onZmenStatus }: {
       <Text style={styles.kartaPopis}>{h.popis}</Text>
       {h.adresa && <Text style={styles.kartaAdresa}>📍 {h.adresa}</Text>}
       {updating ? (
-        <ActivityIndicator size="small" color="#2E7D32" style={{ marginTop: 12 }} />
+        <ActivityIndicator size="small" color={C.primary} style={{ marginTop: 12 }} />
       ) : (
         <View style={styles.akcie}>
           {h.status !== 'v_rieseni' && (
-            <TouchableOpacity style={[styles.akciaBtn, { backgroundColor: '#FFF8E1' }]} onPress={() => onZmenStatus(h.id, 'v_rieseni')}>
-              <Text style={[styles.akciaBtnText, { color: '#F57F17' }]}>V riešení</Text>
+            <TouchableOpacity style={[styles.akciaBtn, { backgroundColor: C.status.warning.bg }]} onPress={() => onZmenStatus(h.id, 'v_rieseni')}>
+              <Text style={[styles.akciaBtnText, { color: C.status.warning.fg }]}>V riešení</Text>
             </TouchableOpacity>
           )}
           {h.status !== 'vyriesene' && (
-            <TouchableOpacity style={[styles.akciaBtn, { backgroundColor: '#E8F5E9' }]} onPress={() => onZmenStatus(h.id, 'vyriesene')}>
-              <Text style={[styles.akciaBtnText, { color: '#2E7D32' }]}>Vyriešené ✓</Text>
+            <TouchableOpacity style={[styles.akciaBtn, { backgroundColor: C.status.success.bg }]} onPress={() => onZmenStatus(h.id, 'vyriesene')}>
+              <Text style={[styles.akciaBtnText, { color: C.status.success.fg }]}>Vyriešené ✓</Text>
             </TouchableOpacity>
           )}
           {h.status !== 'zamietnute' && (
-            <TouchableOpacity style={[styles.akciaBtn, { backgroundColor: '#FFEBEE' }]} onPress={() => onZmenStatus(h.id, 'zamietnute')}>
-              <Text style={[styles.akciaBtnText, { color: '#C62828' }]}>Zamietnuť</Text>
+            <TouchableOpacity style={[styles.akciaBtn, { backgroundColor: C.status.danger.bg }]} onPress={() => onZmenStatus(h.id, 'zamietnute')}>
+              <Text style={[styles.akciaBtnText, { color: C.status.danger.fg }]}>Zamietnuť</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -523,104 +867,104 @@ function HlasenieKarta({ hlasenie: h, updating, onZmenStatus }: {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F7F8FA' },
+  safe: { flex: 1, backgroundColor: C.background },
   header: {
-    backgroundColor: '#1B5E20',
+    backgroundColor: C.primary,
     paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20,
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   logoBadge: {
-    width: 44, height: 44, borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 56, height: 56, borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.15)',
     justifyContent: 'center', alignItems: 'center',
   },
-  logoText: { color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 1 },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  headerSub: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 1 },
+  headerTitle: { color: C.onPrimary, fontSize: 18, fontWeight: '700' },
+  headerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 1 },
   logoutBtn: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(255,255,255,0.18)',
     borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6,
   },
-  logoutText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  logoutText: { color: C.onPrimary, fontSize: 13, fontWeight: '700' },
   taby: {
-    flexDirection: 'row', backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: '#EEEEEE',
+    flexDirection: 'row', backgroundColor: C.surface,
+    borderBottomWidth: 1, borderBottomColor: C.borderLight,
   },
-  tab: { flex: 1, paddingVertical: 14, alignItems: 'center' },
-  tabActive: { borderBottomWidth: 3, borderBottomColor: '#2E7D32' },
-  tabText: { fontSize: 12, fontWeight: '600', color: '#999' },
-  tabTextActive: { color: '#2E7D32' },
+  tab: { flex: 1, paddingVertical: 14, paddingHorizontal: 4, alignItems: 'center' },
+  tabActive: { borderBottomWidth: 3, borderBottomColor: C.primary },
+  tabText: { fontSize: 11, fontWeight: '600', color: C.textMuted },
+  tabTextActive: { color: C.primary, fontWeight: '700' },
   podtaby: {
-    flexDirection: 'row', backgroundColor: '#F7F8FA',
-    borderBottomWidth: 1, borderBottomColor: '#EEEEEE',
+    flexDirection: 'row', backgroundColor: C.background,
+    borderBottomWidth: 1, borderBottomColor: C.borderLight,
   },
   podtab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
-  podtabActive: { borderBottomWidth: 2, borderBottomColor: '#2E7D32' },
-  podtabText: { fontSize: 13, fontWeight: '600', color: '#999' },
-  podtabTextActive: { color: '#2E7D32' },
+  podtabActive: { borderBottomWidth: 2, borderBottomColor: C.primary },
+  podtabText: { fontSize: 13, fontWeight: '600', color: C.textMuted },
+  podtabTextActive: { color: C.primary, fontWeight: '700' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   list: { padding: 16, gap: 10 },
-  sekcia: { fontSize: 13, fontWeight: '700', color: '#666', marginBottom: 4, marginTop: 4 },
+  sekcia: { fontSize: 13, fontWeight: '700', color: C.textSecondary, marginBottom: 4, marginTop: 4 },
   formCard: {
-    backgroundColor: '#fff', borderRadius: 14, padding: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    backgroundColor: C.surface, borderRadius: 14, padding: 16,
+    shadowColor: C.shadow, shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
   },
-  formLabel: { fontSize: 13, fontWeight: '700', color: '#444', marginBottom: 8 },
+  formLabel: { fontSize: 13, fontWeight: '700', color: C.textSecondary, marginBottom: 8 },
   input: {
-    borderWidth: 1.5, borderColor: '#E0E0E0', borderRadius: 10,
-    padding: 12, fontSize: 15, color: '#1A1A1A', marginBottom: 16,
+    borderWidth: 1.5, borderColor: C.border, borderRadius: 10,
+    padding: 12, fontSize: 15, color: C.text, marginBottom: 16,
+    backgroundColor: C.surface,
   },
   katBtn: {
     borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8,
-    backgroundColor: '#F5F5F5', borderWidth: 1.5, borderColor: '#E0E0E0',
+    backgroundColor: C.surfaceAlt, borderWidth: 1.5, borderColor: C.border,
   },
-  katBtnActive: { backgroundColor: '#E8F5E9', borderColor: '#2E7D32' },
-  katBtnText: { fontSize: 13, fontWeight: '600', color: '#666' },
-  katBtnTextActive: { color: '#2E7D32' },
+  katBtnActive: { backgroundColor: C.primaryLight, borderColor: C.primary },
+  katBtnText: { fontSize: 13, fontWeight: '600', color: C.textSecondary },
+  katBtnTextActive: { color: C.primary, fontWeight: '700' },
   publikovatRow: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', marginBottom: 16,
   },
   toggle: {
     width: 48, height: 28, borderRadius: 14,
-    backgroundColor: '#DDD', justifyContent: 'center', padding: 2,
+    backgroundColor: C.border, justifyContent: 'center', padding: 2,
   },
-  toggleActive: { backgroundColor: '#2E7D32' },
-  toggleKnob: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff' },
+  toggleActive: { backgroundColor: C.secondary },
+  toggleKnob: { width: 24, height: 24, borderRadius: 12, backgroundColor: C.surface },
   toggleKnobActive: { alignSelf: 'flex-end' },
   submitBtn: {
-    backgroundColor: '#2E7D32', borderRadius: 12,
+    backgroundColor: C.primary, borderRadius: 12,
     padding: 16, alignItems: 'center',
   },
-  submitBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  submitBtnText: { color: C.onPrimary, fontSize: 15, fontWeight: '700' },
   karta: {
-    backgroundColor: '#fff', borderRadius: 14, padding: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    backgroundColor: C.surface, borderRadius: 14, padding: 16,
+    shadowColor: C.shadow, shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
   },
   kartaHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   kartaEmoji: { fontSize: 28 },
   kartaInfo: { flex: 1 },
-  kartaKategoria: { fontSize: 12, fontWeight: '800', color: '#333', letterSpacing: 0.5 },
-  kartaDatum: { fontSize: 11, color: '#AAA', marginTop: 2 },
+  kartaKategoria: { fontSize: 12, fontWeight: '800', color: C.text, letterSpacing: 0.5 },
+  kartaDatum: { fontSize: 11, color: C.textPlaceholder, marginTop: 2 },
   statusBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
   statusText: { fontSize: 11, fontWeight: '700' },
-  kartaPopis: { fontSize: 14, color: '#444', lineHeight: 20, marginBottom: 6 },
-  kartaAdresa: { fontSize: 12, color: '#888', marginBottom: 4 },
+  kartaPopis: { fontSize: 14, color: C.textSecondary, lineHeight: 20, marginBottom: 6 },
+  kartaAdresa: { fontSize: 12, color: C.textMuted, marginBottom: 4 },
   akcie: { flexDirection: 'row', gap: 8, marginTop: 10, flexWrap: 'wrap' },
   akciaBtn: { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
   akciaBtnText: { fontSize: 12, fontWeight: '700' },
   empty: { alignItems: 'center', paddingTop: 60, gap: 12 },
   emptyEmoji: { fontSize: 48 },
-  emptyText: { fontSize: 16, color: '#888', fontWeight: '600' },
+  emptyText: { fontSize: 16, color: C.textMuted, fontWeight: '600' },
   historiaContainer: {
     marginTop: 12, borderTopWidth: 1,
-    borderTopColor: '#F0F0F0', paddingTop: 10, gap: 6,
+    borderTopColor: C.divider, paddingTop: 10, gap: 6,
   },
-  historiaTitle: { fontSize: 10, fontWeight: '800', color: '#CCC', letterSpacing: 1, marginBottom: 4 },
+  historiaTitle: { fontSize: 10, fontWeight: '800', color: C.textPlaceholder, letterSpacing: 1, marginBottom: 4 },
   historiaZaznam: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  historiaText: { fontSize: 12, color: '#666' },
-  historiaDatum: { fontSize: 11, color: '#BBB' },
+  historiaText: { fontSize: 12, color: C.textSecondary },
+  historiaDatum: { fontSize: 11, color: C.textPlaceholder },
 })
