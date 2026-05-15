@@ -4,17 +4,17 @@ import { supabase } from '@/src/lib/supabase'
 import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import {
-    ActivityIndicator,
-    Alert,
-    Linking,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Linking,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native'
 
 type HistoriaZaznam = {
@@ -71,10 +71,10 @@ const UCEL_LABEL: Record<string, string> = {
 }
 
 const STATUS_FARBY: Record<string, { bg: string; text: string; label: string }> = {
-  nove:       { ...C.status.info,    label: 'Nové' },
-  v_rieseni:  { ...C.status.warning, label: 'V riešení' },
-  vyriesene:  { ...C.status.success, label: 'Vyriešené' },
-  zamietnute: { ...C.status.danger,  label: 'Zamietnuté' },
+  nove:       { bg: C.status.info.bg,    text: C.status.info.fg,    label: 'Nové' },
+  v_rieseni:  { bg: C.status.warning.bg, text: C.status.warning.fg, label: 'V riešení' },
+  vyriesene:  { bg: C.status.success.bg, text: C.status.success.fg, label: 'Vyriešené' },
+  zamietnute: { bg: C.status.danger.bg,  text: C.status.danger.fg,  label: 'Zamietnuté' },
 }
 
 // status objekt používa { bg, fg } v C.status — premapujeme tu na { bg, text }
