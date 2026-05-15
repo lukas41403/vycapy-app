@@ -21,8 +21,16 @@ export default function TabLayout() {
         },
       }}
     >
+      {/* 4 viditeľné taby v dolnej navigácii */}
       <Tabs.Screen
         name="index"
+        options={{
+          title: 'Domov',
+          tabBarIcon: () => <Text style={{ fontSize: 20 }}>🏠</Text>,
+        }}
+      />
+      <Tabs.Screen
+        name="aktuality"
         options={{
           title: 'Aktuality',
           tabBarIcon: () => <Text style={{ fontSize: 20 }}>📰</Text>,
@@ -36,33 +44,18 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="hlasenie"
+        name="viac"
         options={{
-          title: 'Hlásenie',
-          tabBarIcon: () => <Text style={{ fontSize: 20 }}>⚠️</Text>,
+          title: 'Viac',
+          tabBarIcon: () => <Text style={{ fontSize: 20 }}>☰</Text>,
         }}
       />
-      <Tabs.Screen
-        name="podujatia"
-        options={{
-          title: 'Podujatia',
-          tabBarIcon: () => <Text style={{ fontSize: 20 }}>📅</Text>,
-        }}
-      />
-      <Tabs.Screen
-        name="prenajom"
-        options={{
-          title: 'Prenájom',
-          tabBarIcon: () => <Text style={{ fontSize: 20 }}>🏟️</Text>,
-        }}
-      />
-      <Tabs.Screen
-        name="kontakty"
-        options={{
-          title: 'Kontakty',
-          tabBarIcon: () => <Text style={{ fontSize: 20 }}>📞</Text>,
-        }}
-      />
+
+      {/* Skryté obrazovky — dostupné cez router.push, neukazujú sa v tab baru */}
+      <Tabs.Screen name="hlasenie"  options={{ href: null }} />
+      <Tabs.Screen name="podujatia" options={{ href: null }} />
+      <Tabs.Screen name="prenajom"  options={{ href: null }} />
+      <Tabs.Screen name="kontakty"  options={{ href: null }} />
     </Tabs>
   )
 }
