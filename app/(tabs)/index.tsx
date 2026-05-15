@@ -14,11 +14,12 @@ import { C } from '@/constants/colors'
 import { useAktuality } from '@/src/hooks/useAktuality'
 import { useOdpady } from '@/src/hooks/useOdpady'
 import { usePodujatia } from '@/src/hooks/usePodujatia'
+import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { useMemo } from 'react'
 import {
-  ScrollView,
   SafeAreaView,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -71,12 +72,21 @@ const KATEGORIA_LABEL: Record<string, string> = {
 }
 
 const KATEGORIA_FARBY: Record<string, { bg: string; text: string }> = {
-  oznam:     C.status.info,
-  akcia:     C.status.success,
-  uzavierka: { bg: '#FFF3E0', text: '#E65100' },
-  vypadok:   C.status.danger,
-  sport:     C.status.accent,
-  ine:       C.status.neutral,
+  oznam:     { bg: C.status.info.bg,    text: C.status.info.fg },
+  akcia:     { bg: C.status.success.bg, text: C.status.success.fg },
+  uzavierka: { bg: '#FFF3E0',           text: '#E65100' },
+  vypadok:   { bg: C.status.danger.bg,  text: C.status.danger.fg },
+  sport:     { bg: '#E3F2FD',           text: '#1565C0' },
+  ine:       { bg: '#ECEFF1',           text: '#37474F' },
+}
+
+const KATEGORIA_PLACEHOLDER: Record<string, { bg: string; emoji: string }> = {
+  oznam:     { bg: '#90A4AE', emoji: '📋' },
+  akcia:     { bg: '#1B5E20', emoji: '🎉' },
+  uzavierka: { bg: '#C62828', emoji: '🚧' },
+  vypadok:   { bg: '#C62828', emoji: '⚠️' },
+  sport:     { bg: '#1565C0', emoji: '⚽' },
+  ine:       { bg: '#607D8B', emoji: '📰' },
 }
 
 // ─── Komponent ────────────────────────────────────────────────────────────
@@ -185,6 +195,7 @@ export default function DashboardScreen() {
             </View>
             {poslednych2.map(a => {
               const kat = KATEGORIA_FARBY[a.kategoria] ?? KATEGORIA_FARBY.ine
+              const placeholder = KATEGORIA_PLACEHOLDER[a.kategoria] ?? KATEGORIA_PLACEHOLDER.ine
               return (
                 <TouchableOpacity
                   key={a.id}
@@ -192,21 +203,35 @@ export default function DashboardScreen() {
                   activeOpacity={0.8}
                   onPress={() => router.push(`/aktualita/${a.id}` as never)}
                 >
-                  <View style={styles.aktKartaTop}>
-                    <View style={[styles.aktBadge, { backgroundColor: kat.bg }]}>
-                      <Text style={[styles.aktBadgeText, { color: kat.text }]}>
-                        {KATEGORIA_LABEL[a.kategoria] ?? a.kategoria}
+                  {a.cover_url ? (
+                    <Image
+                      source={{ uri: a.cover_url }}
+                      style={styles.aktThumb}
+                      contentFit="cover"
+                      transition={200}
+                    />
+                  ) : (
+                    <View style={[styles.aktThumb, { backgroundColor: placeholder.bg, justifyContent: 'center', alignItems: 'center' }]}>
+                      <Text style={{ fontSize: 28 }}>{placeholder.emoji}</Text>
+                    </View>
+                  )}
+                  <View style={styles.aktInfo}>
+                    <View style={styles.aktKartaTop}>
+                      <View style={[styles.aktBadge, { backgroundColor: kat.bg }]}>
+                        <Text style={[styles.aktBadgeText, { color: kat.text }]}>
+                          {KATEGORIA_LABEL[a.kategoria] ?? a.kategoria}
+                        </Text>
+                      </View>
+                      <Text style={styles.aktDatum}>
+                        {a.published_at
+                          ? new Date(a.published_at).toLocaleDateString('sk-SK', {
+                              day: 'numeric', month: 'short',
+                            })
+                          : ''}
                       </Text>
                     </View>
-                    <Text style={styles.aktDatum}>
-                      {a.published_at
-                        ? new Date(a.published_at).toLocaleDateString('sk-SK', {
-                            day: 'numeric', month: 'short',
-                          })
-                        : ''}
-                    </Text>
+                    <Text style={styles.aktTitle} numberOfLines={2}>{a.title}</Text>
                   </View>
-                  <Text style={styles.aktTitle} numberOfLines={2}>{a.title}</Text>
                 </TouchableOpacity>
               )
             })}
@@ -346,26 +371,29 @@ const styles = StyleSheet.create({
   vyvozDen: { fontSize: 16, fontWeight: '800', color: C.text },
   vyvozDatum: { fontSize: 12, color: C.textPlaceholder, marginTop: 2 },
 
-  // Aktualita karta (malá)
+  // Aktualita karta (malá, s thumbnail vľavo)
   aktKarta: {
+    flexDirection: 'row',
     backgroundColor: C.surface,
     borderRadius: 14,
-    padding: 14,
     marginBottom: 10,
+    overflow: 'hidden',
     shadowColor: C.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 1,
   },
+  aktThumb: { width: 88, height: 88, backgroundColor: C.surfaceAlt },
+  aktInfo: { flex: 1, padding: 12, justifyContent: 'space-between' },
   aktKartaTop: {
     flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 8,
+    alignItems: 'center', marginBottom: 6,
   },
   aktBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   aktBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.3 },
   aktDatum: { fontSize: 11, color: C.textPlaceholder },
-  aktTitle: { fontSize: 15, fontWeight: '700', color: C.text, lineHeight: 21 },
+  aktTitle: { fontSize: 14, fontWeight: '700', color: C.text, lineHeight: 19 },
 
   // Podujatie karta
   podKarta: {
