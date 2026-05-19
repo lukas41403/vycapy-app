@@ -49,6 +49,22 @@ export default function ViacScreen() {
       farba: C.brand.green,
     },
     {
+      id: 'fc',
+      emoji: '⚽',
+      title: 'FC Výčapy-Opatovce',
+      subtitle: 'Oblastná liga · Program, výsledky, káder',
+      path: '/fc',
+      farba: '#1B5E20',
+    },
+    {
+      id: 'referentka',
+      emoji: '🤖',
+      title: 'AI Referentka Marta',
+      subtitle: 'Online 24/7 · Odpovedá na otázky o obci',
+      path: '/referentka',
+      farba: '#6A1B9A',
+    },
+    {
       id: 'hlasenie',
       emoji: '⚠️',
       title: 'Hlásenie porúch',
