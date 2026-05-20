@@ -1,6 +1,8 @@
 import { ErbBadge } from '@/components/AppHeader'
 import { C } from '@/constants/colors'
 import { supabase } from '@/src/lib/supabase'
+import { Image } from 'expo-image'
+import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import {
@@ -28,6 +30,7 @@ type Hlasenie = {
   kategoria: string
   popis: string
   adresa: string | null
+  foto_urls: string[] | null
   status: string
   created_at: string
   historia?: HistoriaZaznam[]
@@ -138,7 +141,7 @@ export default function AdminScreen() {
     const { data } = await supabase
       .from('hlaseniaporuchy')
       .select(`
-        id, kategoria, popis, adresa, status, created_at,
+        id, kategoria, popis, adresa, foto_urls, status, created_at,
         historia:hlasenia_historia(novy_status, stary_status, created_at)
       `)
       .order('created_at', { ascending: false })
@@ -296,6 +299,19 @@ function NovAktualitaForm() {
   const [kategoria, setKategoria] = useState('oznam')
   const [loading, setLoading] = useState(false)
   const [publikovat, setPublikovat] = useState(true)
+  const [coverUri, setCoverUri] = useState<string | null>(null)
+
+  async function vybratCover() {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+      aspect: [16, 9],
+      allowsEditing: true,
+    })
+    if (!result.canceled && result.assets[0]) {
+      setCoverUri(result.assets[0].uri)
+    }
+  }
 
   async function nacitajAktuality() {
     setNacitavam(true)
@@ -331,20 +347,43 @@ function NovAktualitaForm() {
       return
     }
     setLoading(true)
+
+    // Upload cover ak je vybraný
+    let coverUrl: string | null = null
+    if (coverUri) {
+      try {
+        const fileName = `cover-${Date.now()}.jpg`
+        const response = await fetch(coverUri)
+        const blob = await response.blob()
+        const { data, error: upErr } = await supabase.storage
+          .from('aktuality-covers')
+          .upload(fileName, blob, { contentType: 'image/jpeg' })
+        if (!upErr && data) {
+          const { data: urlData } = supabase.storage
+            .from('aktuality-covers')
+            .getPublicUrl(data.path)
+          coverUrl = urlData.publicUrl
+        }
+      } catch (e) {
+        console.warn('Cover upload zlyhal:', e)
+      }
+    }
+
     const { error } = await supabase.from('aktuality').insert({
       title: title.trim(),
       perex: perex.trim() || null,
       body: body.trim(),
       kategoria,
+      cover_url: coverUrl,
       is_published: publikovat,
       published_at: publikovat ? new Date().toISOString() : null,
     })
     setLoading(false)
     if (error) {
-      Alert.alert('Chyba', 'Aktualitu sa nepodarilo uložiť.')
+      Alert.alert('Chyba', 'Aktualitu sa nepodarilo uložiť.\n\n' + error.message)
     } else {
       Alert.alert('Hotovo!', publikovat ? 'Aktualita bola publikovaná.' : 'Uložená ako koncept.')
-      setTitle(''); setPerex(''); setBody(''); setKategoria('oznam')
+      setTitle(''); setPerex(''); setBody(''); setKategoria('oznam'); setCoverUri(null)
     }
   }
 
@@ -384,6 +423,35 @@ function NovAktualitaForm() {
                 ))}
               </View>
             </ScrollView>
+            <Text style={styles.formLabel}>Cover fotka (voliteľné)</Text>
+            <TouchableOpacity onPress={vybratCover} style={styles.coverPickerBtn} activeOpacity={0.8}>
+              {coverUri ? (
+                <View>
+                  <Image
+                    source={{ uri: coverUri }}
+                    style={{ width: '100%', height: 160, borderRadius: 10 }}
+                    contentFit="cover"
+                  />
+                  <TouchableOpacity
+                    style={styles.coverRemove}
+                    onPress={() => setCoverUri(null)}
+                  >
+                    <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.coverPickerPlaceholder}>
+                  <Text style={{ fontSize: 32 }}>🖼️</Text>
+                  <Text style={{ fontSize: 13, color: C.textMuted, marginTop: 8, fontWeight: '600' }}>
+                    Klikni pre výber fotky
+                  </Text>
+                  <Text style={{ fontSize: 11, color: C.textPlaceholder, marginTop: 2 }}>
+                    Pomer 16:9 odporúčaný
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
             <Text style={styles.formLabel}>Titulok *</Text>
             <TextInput style={styles.input} placeholder="Titulok aktuality..."
               placeholderTextColor={C.textPlaceholder} value={title} onChangeText={setTitle} />
@@ -822,6 +890,24 @@ function HlasenieKarta({ hlasenie: h, updating, onZmenStatus }: {
       </View>
       <Text style={styles.kartaPopis}>{h.popis}</Text>
       {h.adresa && <Text style={styles.kartaAdresa}>📍 {h.adresa}</Text>}
+      {h.foto_urls && h.foto_urls.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ marginTop: 8, marginBottom: 4 }}
+        >
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {h.foto_urls.map((url, i) => (
+              <Image
+                key={i}
+                source={{ uri: url }}
+                style={{ width: 88, height: 88, borderRadius: 10, backgroundColor: C.divider }}
+                contentFit="cover"
+              />
+            ))}
+          </View>
+        </ScrollView>
+      )}
       {updating ? (
         <ActivityIndicator size="small" color={C.primary} style={{ marginTop: 12 }} />
       ) : (
@@ -967,4 +1053,29 @@ const styles = StyleSheet.create({
   historiaZaznam: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   historiaText: { fontSize: 12, color: C.textSecondary },
   historiaDatum: { fontSize: 11, color: C.textPlaceholder },
+
+  // Cover picker pre nová aktualita
+  coverPickerBtn: {
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: C.border,
+    borderStyle: 'dashed',
+    overflow: 'hidden',
+    marginBottom: 16,
+    position: 'relative',
+  },
+  coverPickerPlaceholder: {
+    height: 140,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: C.surfaceAlt,
+  },
+  coverRemove: {
+    position: 'absolute',
+    top: 8, right: 8,
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 })

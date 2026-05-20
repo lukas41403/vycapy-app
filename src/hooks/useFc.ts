@@ -27,7 +27,7 @@ export type Hrac = {
 export type Zapas = {
   id: string
   datum: string
-  superár: string
+  supar: string
   je_doma: boolean
   goly_my: number | null
   goly_supar: number | null

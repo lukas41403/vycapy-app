@@ -93,6 +93,7 @@ export default function FcScreen() {
 // ─── Program ───────────────────────────────────────────────────────────────
 function ProgramTab() {
   const { zapasy, loading, error } = useFcZapasy()
+  const [view, setView] = useState<'list' | 'month'>('list')
   const nadchadzajuce = zapasy
     .filter(z => z.goly_my == null)
     .sort((a, b) => new Date(a.datum).getTime() - new Date(b.datum).getTime())
@@ -104,9 +105,50 @@ function ProgramTab() {
     return <Empty emoji="📅" title="Žiadne nadchádzajúce zápasy" />
   }
 
+  // Group by month for month view
+  const podlaMesiaca = nadchadzajuce.reduce((acc, z) => {
+    const m = new Date(z.datum).toLocaleDateString('sk-SK', { month: 'long', year: 'numeric' })
+    const key = m.charAt(0).toUpperCase() + m.slice(1)
+    if (!acc[key]) acc[key] = []
+    acc[key].push(z)
+    return acc
+  }, {} as Record<string, typeof nadchadzajuce>)
+
   return (
     <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-      {nadchadzajuce.map(z => <ZapasKarta key={z.id} zapas={z} typ="program" />)}
+      <View style={styles.fcModeBar}>
+        <TouchableOpacity
+          style={[styles.fcModeBtn, view === 'list' && styles.fcModeBtnActive]}
+          onPress={() => setView('list')}
+        >
+          <Text style={[styles.fcModeBtnText, view === 'list' && styles.fcModeBtnTextActive]}>
+            ☰ Zoznam
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.fcModeBtn, view === 'month' && styles.fcModeBtnActive]}
+          onPress={() => setView('month')}
+        >
+          <Text style={[styles.fcModeBtnText, view === 'month' && styles.fcModeBtnTextActive]}>
+            📅 Mesiac
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {view === 'list' ? (
+        nadchadzajuce.map(z => <ZapasKarta key={z.id} zapas={z} typ="program" />)
+      ) : (
+        Object.entries(podlaMesiaca).map(([m, zList]) => (
+          <View key={m} style={{ gap: 12, marginBottom: 8 }}>
+            <View style={styles.fcMonthHeader}>
+              <View style={styles.fcMonthLine} />
+              <Text style={styles.fcMonthLabel}>{m}</Text>
+              <View style={styles.fcMonthLine} />
+            </View>
+            {zList.map(z => <ZapasKarta key={z.id} zapas={z} typ="program" />)}
+          </View>
+        ))
+      )}
     </ScrollView>
   )
 }
@@ -186,7 +228,7 @@ function ZapasKarta({ zapas, typ }: { zapas: Zapas; typ: 'program' | 'vysledok' 
 
       {/* tímy + výsledok */}
       {typ === 'program' ? (
-        <Text style={styles.zapasTitle}>vs {zapas.superár}</Text>
+        <Text style={styles.zapasTitle}>vs {zapas.supar}</Text>
       ) : (
         <View style={styles.skoreRow}>
           <Text style={styles.skoreTeam}>FC V-O</Text>
@@ -199,7 +241,7 @@ function ZapasKarta({ zapas, typ }: { zapas: Zapas; typ: 'program' | 'vysledok' 
               {zapas.goly_my} : {zapas.goly_supar}
             </Text>
           </View>
-          <Text style={styles.skoreTeam} numberOfLines={1}>{zapas.superár}</Text>
+          <Text style={styles.skoreTeam} numberOfLines={1}>{zapas.supar}</Text>
         </View>
       )}
 
@@ -523,4 +565,27 @@ const styles = StyleSheet.create({
   errTitle: { fontSize: 14, fontWeight: '800', color: C.brand.red },
   errMsg: { fontSize: 13, color: C.textSecondary, lineHeight: 19 },
   errHint: { fontSize: 12, color: C.textMuted, lineHeight: 18 },
+
+  // Mode bar v Program tabe
+  fcModeBar: {
+    flexDirection: 'row', gap: 8, marginBottom: 4,
+  },
+  fcModeBtn: {
+    flex: 1, paddingVertical: 8, borderRadius: 8,
+    backgroundColor: C.surfaceAlt, alignItems: 'center',
+    borderWidth: 1, borderColor: 'transparent',
+  },
+  fcModeBtnActive: { backgroundColor: FC_GREEN_LIGHT, borderColor: FC_GREEN },
+  fcModeBtnText: { fontSize: 12, fontWeight: '700', color: C.textMuted },
+  fcModeBtnTextActive: { color: FC_GREEN },
+
+  fcMonthHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    marginTop: 4, marginBottom: 4,
+  },
+  fcMonthLine: { flex: 1, height: 1, backgroundColor: C.border },
+  fcMonthLabel: {
+    fontSize: 12, fontWeight: '800', color: C.textMuted,
+    letterSpacing: 0.5, textTransform: 'uppercase',
+  },
 })
