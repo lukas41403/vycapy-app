@@ -1,8 +1,9 @@
 /**
- * Aktuality — news feed s 3 zobrazeniami:
- *   - list  (default): veľké karty s cover fotkou
- *   - grid:  2-stĺpcový grid s thumbnail
- *   - month: zoskupenie podľa mesiaca
+ * Aktuality — news feed s 3 zobrazeniami + vyhľadávanie + filter kategórie.
+ *
+ *   Search:  TextInput hore, filtruje cez title + perex (case-insensitive)
+ *   Filter:  chips s kategóriami pod searchom
+ *   View:    list / grid / month toggle
  */
 
 import { AppHeader } from '@/components/AppHeader'
@@ -14,11 +15,13 @@ import { useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
@@ -46,17 +49,44 @@ const KATEGORIA_PLACEHOLDER: Record<string, { bg: string; emoji: string }> = {
   ine:       { bg: '#607D8B', emoji: '📰' },
 }
 
+const KATEGORIE_FILTER = ['oznam', 'akcia', 'uzavierka', 'vypadok', 'sport', 'ine']
+
 type ViewMode = 'list' | 'grid' | 'month'
 type AktualitaItem = ReturnType<typeof useAktuality>['aktuality'][number]
 
 export default function AktualityScreen() {
-  const { aktuality, loading, error } = useAktuality()
+  const { aktuality, loading, error, refresh } = useAktuality()
   const router = useRouter()
   const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [search, setSearch] = useState('')
+  const [activeKat, setActiveKat] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+
+  async function handleRefresh() {
+    setRefreshing(true)
+    await refresh()
+    setRefreshing(false)
+  }
+
+  // Filtered podľa searchu + kategórie
+  const filtrovane = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return aktuality.filter(a => {
+      // Kategória
+      if (activeKat && a.kategoria !== activeKat) return false
+      // Search v title + perex
+      if (q) {
+        const inTitle = a.title?.toLowerCase().includes(q)
+        const inPerex = a.perex?.toLowerCase().includes(q)
+        if (!inTitle && !inPerex) return false
+      }
+      return true
+    })
+  }, [aktuality, search, activeKat])
 
   // Zoskupenie podľa mesiaca pre month view
   const podlaMesiaca = useMemo(() => {
-    const grouped = aktuality.reduce((acc, a) => {
+    const grouped = filtrovane.reduce((acc, a) => {
       const mesiac = a.published_at
         ? new Date(a.published_at).toLocaleDateString('sk-SK', {
             month: 'long', year: 'numeric',
@@ -68,7 +98,9 @@ export default function AktualityScreen() {
       return acc
     }, {} as Record<string, AktualitaItem[]>)
     return grouped
-  }, [aktuality])
+  }, [filtrovane])
+
+  const hasFilter = search.trim().length > 0 || activeKat !== null
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -76,24 +108,72 @@ export default function AktualityScreen() {
 
       <AppHeader title="Aktuality" subtitle="Čo nové v obci" />
 
-      {/* Prepínač zobrazenia */}
+      {/* Search + filter (zobrazí sa po načítaní) */}
       {!loading && !error && aktuality.length > 0 && (
-        <View style={styles.modeBar}>
-          <ModeBtn
-            label="☰ Zoznam"
-            active={viewMode === 'list'}
-            onPress={() => setViewMode('list')}
-          />
-          <ModeBtn
-            label="⊞ Grid"
-            active={viewMode === 'grid'}
-            onPress={() => setViewMode('grid')}
-          />
-          <ModeBtn
-            label="📅 Mesiac"
-            active={viewMode === 'month'}
-            onPress={() => setViewMode('month')}
-          />
+        <View style={styles.filterWrap}>
+          <View style={styles.searchRow}>
+            <Text style={styles.searchIcon}>🔍</Text>
+            <TextInput
+              style={styles.searchInput}
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Hľadať v aktualitách..."
+              placeholderTextColor={C.textPlaceholder}
+              returnKeyType="search"
+            />
+            {search.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearch('')}
+                style={styles.searchClear}
+              >
+                <Text style={styles.searchClearText}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Kategória chips */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipsRow}
+          >
+            <TouchableOpacity
+              style={[styles.chip, !activeKat && styles.chipActive]}
+              onPress={() => setActiveKat(null)}
+            >
+              <Text style={[styles.chipText, !activeKat && styles.chipTextActive]}>
+                Všetko
+              </Text>
+            </TouchableOpacity>
+            {KATEGORIE_FILTER.map(k => {
+              const farba = KATEGORIA_FARBY[k]
+              const active = activeKat === k
+              return (
+                <TouchableOpacity
+                  key={k}
+                  style={[
+                    styles.chip,
+                    active && { backgroundColor: farba.bg, borderColor: farba.text },
+                  ]}
+                  onPress={() => setActiveKat(active ? null : k)}
+                >
+                  <Text style={[
+                    styles.chipText,
+                    active && { color: farba.text, fontWeight: '800' },
+                  ]}>
+                    {KATEGORIA_LABEL[k]}
+                  </Text>
+                </TouchableOpacity>
+              )
+            })}
+          </ScrollView>
+
+          {/* Mode bar */}
+          <View style={styles.modeBar}>
+            <ModeBtn label="☰ Zoznam" active={viewMode === 'list'}  onPress={() => setViewMode('list')} />
+            <ModeBtn label="⊞ Grid"   active={viewMode === 'grid'}  onPress={() => setViewMode('grid')} />
+            <ModeBtn label="📅 Mesiac" active={viewMode === 'month'} onPress={() => setViewMode('month')} />
+          </View>
         </View>
       )}
 
@@ -111,6 +191,26 @@ export default function AktualityScreen() {
         </View>
       )}
 
+      {/* Žiadne výsledky */}
+      {!loading && !error && aktuality.length > 0 && filtrovane.length === 0 && (
+        <View style={styles.empty}>
+          <Text style={styles.emptyIcon}>🔍</Text>
+          <Text style={styles.emptyTitle}>Nič sa nenašlo</Text>
+          <Text style={styles.emptyText}>
+            Skús zmeniť hľadaný výraz alebo zrušiť filter kategórie.
+          </Text>
+          {hasFilter && (
+            <TouchableOpacity
+              style={styles.resetBtn}
+              onPress={() => { setSearch(''); setActiveKat(null) }}
+            >
+              <Text style={styles.resetBtnText}>Zrušiť filter</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      {/* Žiadne aktuality vôbec */}
       {!loading && !error && aktuality.length === 0 && (
         <View style={styles.empty}>
           <Text style={styles.emptyIcon}>📭</Text>
@@ -122,34 +222,43 @@ export default function AktualityScreen() {
       )}
 
       {/* LIST */}
-      {!loading && !error && aktuality.length > 0 && viewMode === 'list' && (
+      {!loading && !error && filtrovane.length > 0 && viewMode === 'list' && (
         <FlatList
-          data={aktuality}
+          data={filtrovane}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.primary} />
+          }
           renderItem={({ item }) => <ListCard item={item} router={router} />}
         />
       )}
 
       {/* GRID */}
-      {!loading && !error && aktuality.length > 0 && viewMode === 'grid' && (
+      {!loading && !error && filtrovane.length > 0 && viewMode === 'grid' && (
         <FlatList
-          data={aktuality}
+          data={filtrovane}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.gridContent}
           columnWrapperStyle={{ gap: 12 }}
           numColumns={2}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.primary} />
+          }
           renderItem={({ item }) => <GridCard item={item} router={router} />}
         />
       )}
 
       {/* MONTH */}
-      {!loading && !error && aktuality.length > 0 && viewMode === 'month' && (
+      {!loading && !error && filtrovane.length > 0 && viewMode === 'month' && (
         <ScrollView
           contentContainerStyle={styles.monthScroll}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.primary} />
+          }
         >
           {Object.entries(podlaMesiaca).map(([mesiac, items]) => (
             <View key={mesiac} style={styles.monthGroup}>
@@ -287,16 +396,71 @@ const styles = StyleSheet.create({
     fontSize: 14, color: C.textMuted, textAlign: 'center',
     lineHeight: 20, marginTop: 4,
   },
+  resetBtn: {
+    marginTop: 16,
+    backgroundColor: C.primary,
+    paddingHorizontal: 24, paddingVertical: 10,
+    borderRadius: 10,
+  },
+  resetBtnText: { color: C.onPrimary, fontWeight: '700', fontSize: 14 },
+
+  // Filter wrap
+  filterWrap: {
+    backgroundColor: C.surface,
+    borderBottomWidth: 1, borderBottomColor: C.borderLight,
+  },
+
+  // Search
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 12,
+    backgroundColor: C.surfaceAlt,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 42,
+  },
+  searchIcon: { fontSize: 16, marginRight: 8 },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: C.text,
+    height: '100%',
+  },
+  searchClear: {
+    width: 24, height: 24, borderRadius: 12,
+    backgroundColor: C.border,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  searchClearText: { color: C.textSecondary, fontSize: 12, fontWeight: '800' },
+
+  // Chips
+  chipsRow: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 12, paddingVertical: 6,
+    backgroundColor: C.surface,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: C.border,
+  },
+  chipActive: {
+    backgroundColor: C.primaryLight,
+    borderColor: C.primary,
+  },
+  chipText: { fontSize: 12, fontWeight: '700', color: C.textSecondary },
+  chipTextActive: { color: C.primary },
 
   // Mode bar
   modeBar: {
     flexDirection: 'row',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingBottom: 10,
     gap: 8,
-    backgroundColor: C.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: C.borderLight,
   },
   modeBtn: {
     flex: 1,

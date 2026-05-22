@@ -11,7 +11,12 @@ import { AppHeader } from '@/components/AppHeader'
 import { C } from '@/constants/colors'
 import { supabase } from '@/src/lib/supabase'
 import { Image } from 'expo-image'
-import * as ImagePicker from 'expo-image-picker'
+// ── expo-image-picker ─────────────────────────────────────────────────────
+// Akonáhle spustíš `npx expo install expo-image-picker expo-media-library`,
+// odkomentuj nasledovný riadok a zmaž `ImagePicker = null` fallback nižšie.
+// import * as ImagePicker from 'expo-image-picker'
+const ImagePicker: any = null
+// ──────────────────────────────────────────────────────────────────────────
 import { useState } from 'react'
 import {
   ActivityIndicator,
@@ -46,7 +51,17 @@ export default function HlasenieScreen() {
   const [odoslane, setOdoslane] = useState(false)
 
   // ── Foto handlery ─────────────────────────────────────────────────────────
+  function picker_unavailable() {
+    Alert.alert(
+      'Foto funkcia',
+      'Pre prácu s fotkami nainštaluj balík expo-image-picker:\n\n' +
+      'npx expo install expo-image-picker expo-media-library\n\n' +
+      'Potom odkomentuj `import * as ImagePicker` v hlasenie.tsx.',
+    )
+  }
+
   async function vyfotit() {
+    if (!ImagePicker) { picker_unavailable(); return }
     const { status } = await ImagePicker.requestCameraPermissionsAsync()
     if (status !== 'granted') {
       Alert.alert('Povolenie', 'Potrebujeme prístup ku kamere.')
@@ -59,6 +74,7 @@ export default function HlasenieScreen() {
   }
 
   async function vybratFotku() {
+    if (!ImagePicker) { picker_unavailable(); return }
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (status !== 'granted') {
       Alert.alert('Povolenie', 'Potrebujeme prístup k fotkám.')
@@ -71,7 +87,7 @@ export default function HlasenieScreen() {
       selectionLimit: MAX_FOTIEK - fotky.length,
     })
     if (!result.canceled) {
-      const uri = result.assets.map(a => a.uri)
+      const uri = result.assets.map((a: any) => a.uri)
       setFotky(prev => [...prev, ...uri].slice(0, MAX_FOTIEK))
     }
   }

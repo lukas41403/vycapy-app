@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 export type Aktualita = {
@@ -16,21 +16,22 @@ export function useAktuality() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    async function fetch() {
-      const { data, error } = await supabase
-        .from('aktuality')
-        .select('*')
-        .eq('is_published', true)
-        .order('published_at', { ascending: false })
-        .limit(20)
+  const load = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('aktuality')
+      .select('*')
+      .eq('is_published', true)
+      .order('published_at', { ascending: false })
+      .limit(20)
 
-      if (error) setError(error.message)
-      else setAktuality(data || [])
-      setLoading(false)
-    }
-    fetch()
+    if (error) setError(error.message)
+    else { setAktuality(data || []); setError(null) }
+    setLoading(false)
   }, [])
 
-  return { aktuality, loading, error }
+  useEffect(() => { load() }, [load])
+
+  const refresh = useCallback(async () => { await load() }, [load])
+
+  return { aktuality, loading, error, refresh }
 }

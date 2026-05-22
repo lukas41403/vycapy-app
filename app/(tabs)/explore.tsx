@@ -11,7 +11,9 @@ import { useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
+  RefreshControl,
   SafeAreaView,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -39,8 +41,15 @@ function formatDatum(datum: string) {
 type ViewMode = 'list' | 'month'
 
 export default function OdpadyScreen() {
-  const { odpady, loading, error } = useOdpady()
+  const { odpady, loading, error, refresh } = useOdpady()
   const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [refreshing, setRefreshing] = useState(false)
+
+  async function handleRefresh() {
+    setRefreshing(true)
+    await refresh()
+    setRefreshing(false)
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -96,6 +105,9 @@ export default function OdpadyScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.primary} />
+          }
           renderItem={({ item }) => {
             const { hlavny, sub, urgent } = formatDatum(item.datum)
             return (
@@ -205,7 +217,11 @@ function MesacnyKalendar({ odpady }: { odpady: OdpadItem[] }) {
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={{ paddingBottom: 24 }}
+      showsVerticalScrollIndicator={false}
+    >
       {/* Mesiac navigátor */}
       <View style={styles.monthNav}>
         <TouchableOpacity onPress={predchadzajuci} style={styles.navBtn}>
@@ -236,7 +252,11 @@ function MesacnyKalendar({ odpady }: { odpady: OdpadItem[] }) {
       <View style={styles.calendarGrid}>
         {cells.map((d, idx) => {
           if (d === null) {
-            return <View key={idx} style={styles.dayCell} />
+            return (
+              <View key={idx} style={styles.dayCell}>
+                <View style={styles.dayCellInner} />
+              </View>
+            )
           }
           const key = keyFor(d)
           const odpadyTohoDna = podlaDna[key] ?? []
@@ -245,36 +265,67 @@ function MesacnyKalendar({ odpady }: { odpady: OdpadItem[] }) {
             dnes.getMonth() === mesiac &&
             dnes.getDate() === d
           const isSelected = vybranyKey === key
+          const maOdpad = odpadyTohoDna.length > 0
 
+          // Pri viacerých typoch v jeden deň rozdelíme bunku na farebné pruhy.
+          // Pri jednom type celá bunka vyfarbená.
           return (
-            <TouchableOpacity
-              key={idx}
-              style={[
-                styles.dayCell,
-                isToday && styles.dayCellToday,
-                isSelected && styles.dayCellSelected,
-              ]}
-              activeOpacity={0.7}
-              onPress={() => setVybrany(new Date(rok, mesiac, d))}
-            >
-              <Text style={[
-                styles.dayNum,
-                isToday && styles.dayNumToday,
-              ]}>
-                {d}
-              </Text>
-              <View style={styles.dots}>
-                {odpadyTohoDna.slice(0, 3).map((o, i) => (
-                  <View
-                    key={i}
-                    style={[styles.dot, { backgroundColor: o.typ.farba }]}
-                  />
-                ))}
-                {odpadyTohoDna.length > 3 && (
-                  <View style={[styles.dot, { backgroundColor: C.textMuted }]} />
+            <View key={idx} style={styles.dayCell}>
+              <TouchableOpacity
+                style={[
+                  styles.dayCellInner,
+                  isToday && !maOdpad && styles.dayCellToday,
+                  isSelected && styles.dayCellSelected,
+                ]}
+                activeOpacity={0.7}
+                onPress={() => setVybrany(new Date(rok, mesiac, d))}
+              >
+                {/* Farebné pozadie podľa typu(ov) odpadu */}
+                {maOdpad && (
+                  <View style={styles.dayBgWrap} pointerEvents="none">
+                    {odpadyTohoDna.map((o, i) => (
+                      <View
+                        key={i}
+                        style={{
+                          flex: 1,
+                          backgroundColor: o.typ.farba,
+                        }}
+                      />
+                    ))}
+                  </View>
                 )}
-              </View>
-            </TouchableOpacity>
+
+                {/* Číslo dňa */}
+                <Text style={[
+                  styles.dayNum,
+                  isToday && !maOdpad && styles.dayNumToday,
+                  maOdpad && styles.dayNumOnColor,
+                ]}>
+                  {d}
+                </Text>
+
+                {/* Názvy typov odpadu — biele písmo na farebnom pozadí */}
+                {maOdpad && (
+                  <View style={styles.typBlock}>
+                    {odpadyTohoDna.slice(0, 2).map((o, i) => (
+                      <Text
+                        key={i}
+                        style={styles.typLabel}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
+                        {o.typ.nazov}
+                      </Text>
+                    ))}
+                    {odpadyTohoDna.length > 2 && (
+                      <Text style={styles.typMoreText}>
+                        +{odpadyTohoDna.length - 2} ďalší
+                      </Text>
+                    )}
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
           )
         })}
       </View>
@@ -316,7 +367,7 @@ function MesacnyKalendar({ odpady }: { odpady: OdpadItem[] }) {
           </Text>
         )}
       </View>
-    </View>
+    </ScrollView>
   )
 }
 
@@ -418,30 +469,81 @@ const styles = StyleSheet.create({
   calendarGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
     backgroundColor: C.surface,
   },
   dayCell: {
+    // 7 stĺpcov bez gap (gap + width: 100/7% spôsobuje pretekanie)
+    // Margin 2px na každú stranu vytvorí 4px efektívny gap medzi bunkami,
+    // a bunka má `boxSizing: 'border-box'` semantiku v RN — všetko sa zmestí.
     width: `${100 / 7}%`,
+    padding: 2,
+    // aspectRatio aplikujeme na vnútorný wrapper aby gap fungoval správne
+  },
+  dayCellInner: {
     aspectRatio: 1,
     justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingTop: 8,
-    gap: 4,
-    borderRadius: 8,
+    paddingTop: 4,
+    borderRadius: 10,
+    overflow: 'hidden',
+    position: 'relative',
   },
   dayCellToday: {
     backgroundColor: C.primaryLight,
   },
   dayCellSelected: {
-    backgroundColor: C.accentLight,
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: C.accent,
   },
-  dayNum: { fontSize: 14, fontWeight: '600', color: C.text },
+
+  // Farebné pozadie pre dni s vývozom (vyplní celú bunku, pri 2+ typoch
+  // sa rozdelí na rovnaké horizontálne pruhy).
+  dayBgWrap: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    flexDirection: 'column',
+  },
+
+  dayNum: { fontSize: 14, fontWeight: '700', color: C.text },
   dayNumToday: { color: C.primary, fontWeight: '900' },
-  dots: { flexDirection: 'row', gap: 3, marginTop: 2 },
-  dot: { width: 6, height: 6, borderRadius: 3 },
+  dayNumOnColor: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    textShadowColor: 'rgba(0,0,0,0.25)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+
+  // Názvy typov odpadu v bunke
+  typBlock: {
+    position: 'absolute',
+    bottom: 4,
+    left: 2,
+    right: 2,
+    alignItems: 'center',
+    gap: 1,
+  },
+  typLabel: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+    textAlign: 'center',
+    letterSpacing: 0.2,
+    textShadowColor: 'rgba(0,0,0,0.35)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+    maxWidth: '100%',
+  },
+  typMoreText: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 9,
+    fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.25)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
+  },
 
   // Detail vybraného dňa
   detailBox: {

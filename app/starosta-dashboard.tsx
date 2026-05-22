@@ -11,18 +11,21 @@
 
 import { C } from '@/constants/colors'
 import { useObecneZariadenia, Zariadenie } from '@/src/hooks/useObecneZariadenia'
+import { odoslatVarovanie } from '@/src/lib/pushNotifications'
 import { supabase } from '@/src/lib/supabase'
 import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
@@ -34,6 +37,39 @@ export default function StarostaDashboard() {
     zariadenia, loading, error, nacitaj,
     toggleStav, nastavitVsetkyOsvetlenia,
   } = useObecneZariadenia()
+
+  // Push notifikácie modal
+  const [pushOpen, setPushOpen] = useState(false)
+  const [pushTitle, setPushTitle] = useState('')
+  const [pushBody, setPushBody] = useState('')
+  const [pushSending, setPushSending] = useState(false)
+
+  async function poslaPush() {
+    if (pushTitle.trim().length < 3 || pushBody.trim().length < 5) {
+      Alert.alert('Vyplňte správu', 'Titulok aspoň 3 znaky, text aspoň 5 znakov.')
+      return
+    }
+    setPushSending(true)
+    try {
+      const r = await odoslatVarovanie({
+        title: pushTitle.trim(),
+        body: pushBody.trim(),
+      })
+      Alert.alert(
+        'Hotovo',
+        `Odoslané: ${r.ok}\nChyby: ${r.chyba}\nCelkom tokenov: ${r.total}`,
+      )
+      setPushTitle(''); setPushBody(''); setPushOpen(false)
+    } catch (e: any) {
+      Alert.alert(
+        'Chyba',
+        e?.message ?? 'Push sa nepodarilo odoslať.' +
+        '\n\nTip: vytvor tabuľku push_tokens v Supabase a nainštaluj `expo-notifications`.',
+      )
+    } finally {
+      setPushSending(false)
+    }
+  }
 
   // Auth gate — rovnaký pattern ako v admin.tsx
   useEffect(() => {
@@ -57,12 +93,8 @@ export default function StarostaDashboard() {
   const senzory = zariadenia.filter(z => z.typ !== 'osvetlenie')
   const zapnutych = osvetlenia.filter(o => o.stav).length
 
-  async function odoslatVarovanie() {
-    Alert.alert(
-      'Poslať varovanie občanom',
-      'Push notifikácie budú dostupné po nasadení push servera (Expo Push Tokens). Pre teraz zatiaľ ako koncept.',
-      [{ text: 'OK' }]
-    )
+  function otvorPushModal() {
+    setPushOpen(true)
   }
 
   return (
@@ -170,7 +202,7 @@ export default function StarostaDashboard() {
             <TouchableOpacity
               style={styles.akciaBtn}
               activeOpacity={0.85}
-              onPress={odoslatVarovanie}
+              onPress={otvorPushModal}
             >
               <Text style={styles.akciaBtnEmoji}>🔴</Text>
               <View style={{ flex: 1 }}>
@@ -197,6 +229,63 @@ export default function StarostaDashboard() {
           <View style={{ height: 24 }} />
         </ScrollView>
       )}
+
+      {/* PUSH MODAL */}
+      <Modal
+        visible={pushOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setPushOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>🔴 Varovanie občanom</Text>
+            <Text style={styles.modalSub}>
+              Notifikácia príde všetkým, čo majú appku nainštalovanú.
+            </Text>
+
+            <Text style={styles.modalLabel}>Titulok</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={pushTitle}
+              onChangeText={setPushTitle}
+              placeholder="napr. Výpadok vody"
+              placeholderTextColor={C.textPlaceholder}
+              maxLength={60}
+            />
+
+            <Text style={styles.modalLabel}>Text správy</Text>
+            <TextInput
+              style={[styles.modalInput, { height: 100 }]}
+              value={pushBody}
+              onChangeText={setPushBody}
+              placeholder="napr. Dnes 14:00–16:00 bude prerušená dodávka..."
+              placeholderTextColor={C.textPlaceholder}
+              multiline
+              textAlignVertical="top"
+              maxLength={240}
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnCancel]}
+                onPress={() => setPushOpen(false)}
+              >
+                <Text style={styles.modalBtnCancelText}>Zrušiť</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnSend, pushSending && { opacity: 0.6 }]}
+                onPress={poslaPush}
+                disabled={pushSending}
+              >
+                {pushSending
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={styles.modalBtnSendText}>📨 Odoslať</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   )
 }
@@ -407,4 +496,54 @@ const styles = StyleSheet.create({
   akciaBtnTitle: { fontSize: 15, fontWeight: '700', color: C.text },
   akciaBtnSub: { fontSize: 12, color: C.textMuted, marginTop: 2 },
   akciaBtnChevron: { fontSize: 28, color: C.textPlaceholder, fontWeight: '300' },
+
+  // Modal pre push
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalBox: {
+    backgroundColor: C.surface,
+    borderRadius: 16,
+    padding: 20,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  modalTitle: {
+    fontSize: 18, fontWeight: '900', color: C.brand.red,
+  },
+  modalSub: {
+    fontSize: 12, color: C.textMuted, marginBottom: 6,
+  },
+  modalLabel: {
+    fontSize: 12, fontWeight: '700', color: C.textSecondary,
+    marginTop: 8, marginBottom: 4,
+  },
+  modalInput: {
+    backgroundColor: C.surfaceAlt,
+    borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 10,
+    fontSize: 14, color: C.text,
+    borderWidth: 1, borderColor: C.border,
+  },
+  modalActions: {
+    flexDirection: 'row', gap: 10, marginTop: 14,
+  },
+  modalBtn: {
+    flex: 1, paddingVertical: 12, borderRadius: 10,
+    alignItems: 'center',
+  },
+  modalBtnCancel: {
+    backgroundColor: C.surfaceAlt,
+    borderWidth: 1, borderColor: C.border,
+  },
+  modalBtnCancelText: { color: C.text, fontWeight: '700', fontSize: 14 },
+  modalBtnSend: { backgroundColor: C.brand.red },
+  modalBtnSendText: { color: '#fff', fontWeight: '800', fontSize: 14 },
 })

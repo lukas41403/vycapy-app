@@ -2,7 +2,12 @@ import { ErbBadge } from '@/components/AppHeader'
 import { C } from '@/constants/colors'
 import { supabase } from '@/src/lib/supabase'
 import { Image } from 'expo-image'
-import * as ImagePicker from 'expo-image-picker'
+// ── expo-image-picker ─────────────────────────────────────────────────────
+// Akonáhle spustíš `npx expo install expo-image-picker`, odkomentuj nasledovný
+// riadok a zmaž `ImagePicker = null` fallback nižšie.
+// import * as ImagePicker from 'expo-image-picker'
+const ImagePicker: any = null
+// ──────────────────────────────────────────────────────────────────────────
 import { useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import {
@@ -113,7 +118,7 @@ const PODUJATIE_KATEGORIE = [
 ]
 
 export default function AdminScreen() {
-  const [aktTab, setAktTab] = useState<'hlasenia' | 'aktuality' | 'podujatia' | 'prenajmy'>('hlasenia')
+  const [aktTab, setAktTab] = useState<'hlasenia' | 'aktuality' | 'podujatia' | 'prenajmy' | 'ankety'>('hlasenia')
   const [hlasenia, setHlasenia] = useState<Hlasenie[]>([])
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
@@ -245,6 +250,17 @@ export default function AdminScreen() {
             🏟️ Prenájmy
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, aktTab === 'ankety' && styles.tabActive]}
+          onPress={() => setAktTab('ankety')}
+        >
+          <Text
+            style={[styles.tabText, aktTab === 'ankety' && styles.tabTextActive]}
+            numberOfLines={1}
+          >
+            🗳️ Ankety
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {aktTab === 'hlasenia' ? (
@@ -282,8 +298,10 @@ export default function AdminScreen() {
         <NovAktualitaForm />
       ) : aktTab === 'podujatia' ? (
         <NovePodujatieForm />
-      ) : (
+      ) : aktTab === 'prenajmy' ? (
         <PrenajmyZoznam />
+      ) : (
+        <AnketyAdminPanel />
       )}
     </SafeAreaView>
   )
@@ -302,6 +320,15 @@ function NovAktualitaForm() {
   const [coverUri, setCoverUri] = useState<string | null>(null)
 
   async function vybratCover() {
+    if (!ImagePicker) {
+      Alert.alert(
+        'Foto funkcia',
+        'Pre nahrávanie cover fotky nainštaluj balík expo-image-picker:\n\n' +
+        'npx expo install expo-image-picker\n\n' +
+        'Potom odkomentuj `import * as ImagePicker` v admin.tsx.',
+      )
+      return
+    }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
@@ -865,6 +892,188 @@ const prenajomStyles = StyleSheet.create({
     fontSize: 11, color: C.textPlaceholder, marginTop: 2,
   },
 })
+
+function AnketyAdminPanel() {
+  const [podtab, setPodtab] = useState<'nova' | 'zoznam'>('nova')
+  const [otazka, setOtazka] = useState('')
+  const [popis, setPopis] = useState('')
+  const [deadline, setDeadline] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [ankety, setAnkety] = useState<any[]>([])
+  const [nacitavam, setNacitavam] = useState(false)
+
+  async function nacitajAnkety() {
+    setNacitavam(true)
+    const { data } = await supabase
+      .from('ankety')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(30)
+    setAnkety(data || [])
+    setNacitavam(false)
+  }
+
+  async function vytvor() {
+    if (otazka.trim().length < 5) {
+      Alert.alert('Krátka otázka', 'Otázka musí mať aspoň 5 znakov.')
+      return
+    }
+    setLoading(true)
+    const { error } = await supabase.from('ankety').insert({
+      otazka: otazka.trim(),
+      popis: popis.trim() || null,
+      deadline: deadline.trim() || null,
+      je_aktivna: true,
+    })
+    setLoading(false)
+    if (error) {
+      Alert.alert('Chyba', 'Anketu sa nepodarilo vytvoriť.\n\n' + error.message)
+    } else {
+      Alert.alert('Hotovo!', 'Anketa bola vytvorená a je aktívna.')
+      setOtazka(''); setPopis(''); setDeadline('')
+    }
+  }
+
+  async function toggleAktivna(id: string, jeAktivna: boolean) {
+    await supabase
+      .from('ankety')
+      .update({ je_aktivna: !jeAktivna })
+      .eq('id', id)
+    nacitajAnkety()
+  }
+
+  async function zmaz(id: string) {
+    Alert.alert('Zmazať anketu?', 'Vrátane všetkých hlasov.', [
+      { text: 'Zrušiť', style: 'cancel' },
+      {
+        text: 'Zmazať', style: 'destructive',
+        onPress: async () => {
+          await supabase.from('ankety').delete().eq('id', id)
+          nacitajAnkety()
+        },
+      },
+    ])
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={styles.podtaby}>
+        <TouchableOpacity
+          style={[styles.podtab, podtab === 'nova' && styles.podtabActive]}
+          onPress={() => setPodtab('nova')}
+        >
+          <Text style={[styles.podtabText, podtab === 'nova' && styles.podtabTextActive]}>
+            ✍️ Nová anketa
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.podtab, podtab === 'zoznam' && styles.podtabActive]}
+          onPress={() => { setPodtab('zoznam'); nacitajAnkety() }}
+        >
+          <Text style={[styles.podtabText, podtab === 'zoznam' && styles.podtabTextActive]}>
+            📋 Zoznam
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {podtab === 'nova' ? (
+        <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+          <View style={styles.formCard}>
+            <Text style={styles.formLabel}>Otázka *</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="napr. Súhlasíte s výstavbou novej cyklotrasy?"
+              placeholderTextColor={C.textPlaceholder}
+              value={otazka} onChangeText={setOtazka}
+              multiline
+            />
+            <Text style={styles.formLabel}>Popis (voliteľné)</Text>
+            <TextInput
+              style={[styles.input, { height: 100 }]}
+              placeholder="Bližšie informácie pre občanov..."
+              placeholderTextColor={C.textPlaceholder}
+              value={popis} onChangeText={setPopis}
+              multiline textAlignVertical="top"
+            />
+            <Text style={styles.formLabel}>Deadline (voliteľné, formát YYYY-MM-DD)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="napr. 2026-06-30"
+              placeholderTextColor={C.textPlaceholder}
+              value={deadline} onChangeText={setDeadline}
+            />
+            <TouchableOpacity
+              style={[styles.submitBtn, loading && { opacity: 0.6 }]}
+              onPress={vytvor} disabled={loading}
+            >
+              {loading
+                ? <ActivityIndicator color={C.onPrimary} />
+                : <Text style={styles.submitBtnText}>🗳️ Spustiť anketu</Text>}
+            </TouchableOpacity>
+            <Text style={{ fontSize: 12, color: C.textMuted, textAlign: 'center', marginTop: 12 }}>
+              Občania uvidia anketu v menu „Viac → Ankety obce".
+            </Text>
+          </View>
+        </ScrollView>
+      ) : (
+        <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+          {nacitavam && <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }} />}
+          {!nacitavam && ankety.length === 0 && (
+            <View style={styles.empty}>
+              <Text style={styles.emptyEmoji}>🗳️</Text>
+              <Text style={styles.emptyText}>Žiadne ankety</Text>
+            </View>
+          )}
+          {!nacitavam && ankety.map(a => (
+            <View key={a.id} style={styles.karta}>
+              <View style={styles.kartaHeader}>
+                <View style={styles.kartaInfo}>
+                  <Text style={styles.kartaPopis} numberOfLines={2}>{a.otazka}</Text>
+                  {a.popis && <Text style={styles.kartaDatum}>{a.popis.slice(0, 80)}{a.popis.length > 80 ? '…' : ''}</Text>}
+                </View>
+                <View style={[
+                  styles.statusBadge,
+                  { backgroundColor: a.je_aktivna ? C.status.success.bg : C.status.neutral.bg }
+                ]}>
+                  <Text style={[styles.statusText, {
+                    color: a.je_aktivna ? C.status.success.fg : C.status.neutral.fg
+                  }]}>
+                    {a.je_aktivna ? 'Aktívna' : 'Ukončená'}
+                  </Text>
+                </View>
+              </View>
+              {a.deadline && (
+                <Text style={styles.kartaDatum}>
+                  ⏰ Deadline: {new Date(a.deadline).toLocaleDateString('sk-SK')}
+                </Text>
+              )}
+              <View style={styles.akcie}>
+                <TouchableOpacity
+                  style={[styles.akciaBtn, {
+                    backgroundColor: a.je_aktivna ? C.status.warning.bg : C.status.success.bg
+                  }]}
+                  onPress={() => toggleAktivna(a.id, a.je_aktivna)}
+                >
+                  <Text style={[styles.akciaBtnText, {
+                    color: a.je_aktivna ? C.status.warning.fg : C.status.success.fg
+                  }]}>
+                    {a.je_aktivna ? '⏸ Ukončiť' : '▶ Aktivovať'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.akciaBtn, { backgroundColor: C.status.danger.bg }]}
+                  onPress={() => zmaz(a.id)}
+                >
+                  <Text style={[styles.akciaBtnText, { color: C.status.danger.fg }]}>🗑️ Zmazať</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))}
+        </ScrollView>
+      )}
+    </View>
+  )
+}
 
 function HlasenieKarta({ hlasenie: h, updating, onZmenStatus }: {
   hlasenie: Hlasenie

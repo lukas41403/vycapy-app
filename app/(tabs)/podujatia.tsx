@@ -3,9 +3,10 @@ import { C } from '@/constants/colors'
 import { usePodujatia } from '@/src/hooks/usePodujatia'
 import { useRouter } from 'expo-router'
 import {
-    ActivityIndicator, SafeAreaView, ScrollView,
+    ActivityIndicator, RefreshControl, SafeAreaView, ScrollView,
     StatusBar, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native'
+import { useState } from 'react'
 
 const KATEGORIA_CONFIG: Record<string, { emoji: string; farba: string; label: string }> = {
   kultura:  { emoji: '🎭', farba: '#6A1B9A',     label: 'Kultúra' },
@@ -32,8 +33,15 @@ function jeBlizko(datum: string) {
 }
 
 export default function PodujatiaScreen() {
-  const { podujatia, loading, error } = usePodujatia()
+  const { podujatia, loading, error, refresh } = usePodujatia()
   const router = useRouter()
+  const [refreshing, setRefreshing] = useState(false)
+
+  async function handleRefresh() {
+    setRefreshing(true)
+    await refresh()
+    setRefreshing(false)
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -66,7 +74,13 @@ export default function PodujatiaScreen() {
       )}
 
       {!loading && !error && podujatia.length > 0 && (
-        <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.primary} />
+          }
+        >
           {podujatia.map(p => {
             const kat = KATEGORIA_CONFIG[p.kategoria] ?? KATEGORIA_CONFIG.ine
             const { den, cas } = formatDatum(p.datum_od, p.datum_do)

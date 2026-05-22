@@ -7,6 +7,7 @@
 
 import { AppHeader } from '@/components/AppHeader'
 import { C } from '@/constants/colors'
+import { ThemeMode, useThemeMode } from '@/src/theme/ThemeContext'
 import { useRouter } from 'expo-router'
 import { Alert, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 
@@ -22,6 +23,7 @@ type MenuItem = {
 
 export default function ViacScreen() {
   const router = useRouter()
+  const { mode, setMode, scheme } = useThemeMode()
 
   const items: MenuItem[] = [
     {
@@ -65,6 +67,14 @@ export default function ViacScreen() {
       farba: '#6A1B9A',
     },
     {
+      id: 'ankety',
+      emoji: '🗳️',
+      title: 'Ankety obce',
+      subtitle: 'Hlasujte o dôležitých otázkach',
+      path: '/ankety',
+      farba: '#7B1FA2',
+    },
+    {
       id: 'hlasenie',
       emoji: '⚠️',
       title: 'Hlásenie porúch',
@@ -95,6 +105,14 @@ export default function ViacScreen() {
       title: 'Správa obce',
       subtitle: 'Smart obec — IoT a infraštruktúra',
       path: '/starosta-dashboard',
+      farba: '#0D47A1',
+    },
+    {
+      id: 'mapa',
+      emoji: '🗺️',
+      title: 'Mapa obce',
+      subtitle: 'Osvetlenie, senzory, hlásenia na mape',
+      path: '/mapa',
       farba: '#0D47A1',
     },
     {
@@ -139,6 +157,33 @@ export default function ViacScreen() {
           ))}
         </View>
 
+        {/* Tmavý režim prepínač */}
+        <View style={styles.themeBox}>
+          <Text style={styles.themeTitle}>🌓 Vzhľad aplikácie</Text>
+          <View style={styles.themeRow}>
+            {(['light', 'auto', 'dark'] as ThemeMode[]).map(m => {
+              const labels = { light: '☀️ Svetlý', auto: '⚙️ Auto', dark: '🌙 Tmavý' }
+              const active = mode === m
+              return (
+                <TouchableOpacity
+                  key={m}
+                  style={[styles.themeBtn, active && styles.themeBtnActive]}
+                  onPress={() => setMode(m)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.themeBtnText, active && styles.themeBtnTextActive]}>
+                    {labels[m]}
+                  </Text>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+          <Text style={styles.themeHint}>
+            Aktuálne: {scheme === 'dark' ? 'Tmavý režim' : 'Svetlý režim'}
+            {mode === 'auto' && ' (podľa systému)'}
+          </Text>
+        </View>
+
         <View style={styles.about}>
           <Text style={styles.aboutTitle}>O aplikácii</Text>
           <Text style={styles.aboutText}>
@@ -178,6 +223,41 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: '700', color: C.text },
   subtitle: { fontSize: 12, color: C.textMuted, marginTop: 2 },
   chevron: { fontSize: 28, color: C.textPlaceholder, fontWeight: '300' },
+
+  // Theme switcher
+  themeBox: {
+    marginTop: 24,
+    backgroundColor: C.surface,
+    borderRadius: 14,
+    padding: 14,
+    shadowColor: C.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  themeTitle: {
+    fontSize: 14, fontWeight: '800', color: C.text,
+    marginBottom: 10,
+  },
+  themeRow: { flexDirection: 'row', gap: 8 },
+  themeBtn: {
+    flex: 1, paddingVertical: 10,
+    backgroundColor: C.surfaceAlt,
+    borderRadius: 10,
+    borderWidth: 1, borderColor: 'transparent',
+    alignItems: 'center',
+  },
+  themeBtnActive: {
+    backgroundColor: C.primaryLight,
+    borderColor: C.primary,
+  },
+  themeBtnText: { fontSize: 12, fontWeight: '700', color: C.textSecondary },
+  themeBtnTextActive: { color: C.primary },
+  themeHint: {
+    fontSize: 11, color: C.textMuted,
+    textAlign: 'center', marginTop: 8,
+  },
 
   about: {
     marginTop: 24,

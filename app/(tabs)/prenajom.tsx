@@ -1,7 +1,7 @@
 import { AppHeader } from '@/components/AppHeader'
 import { C } from '@/constants/colors'
 import { supabase } from '@/src/lib/supabase'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
     ActivityIndicator, Alert, SafeAreaView, ScrollView,
     StatusBar, StyleSheet, Text, TextInput,
@@ -16,6 +16,20 @@ const UCELY = [
   { id: 'ine', label: '📋 Iné' },
 ]
 
+type Rezervacia = {
+  id: string
+  datum: string       // YYYY-MM-DD
+  cas_od: string      // HH:MM
+  cas_do: string      // HH:MM
+  ucel: string
+  status?: string | null
+}
+
+const MESIACE_SK = [
+  'Január', 'Február', 'Marec', 'Apríl', 'Máj', 'Jún',
+  'Júl', 'August', 'September', 'Október', 'November', 'December',
+]
+
 export default function PrenajomScreen() {
   const [meno, setMeno] = useState('')
   const [email, setEmail] = useState('')
@@ -28,6 +42,22 @@ export default function PrenajomScreen() {
   const [poznamka, setPoznamka] = useState('')
   const [loading, setLoading] = useState(false)
   const [odoslane, setOdoslane] = useState(false)
+
+  // Voľný kalendár — schválené rezervácie
+  const [rezervacie, setRezervacie] = useState<Rezervacia[]>([])
+  useEffect(() => {
+    async function fetchRezervacie() {
+      const dnes = new Date().toISOString().split('T')[0]
+      const { data } = await supabase
+        .from('prenajom_haly')
+        .select('id, datum, cas_od, cas_do, ucel, status')
+        .eq('status', 'schvalene')
+        .gte('datum', dnes)
+        .order('datum', { ascending: true })
+      if (data) setRezervacie(data as Rezervacia[])
+    }
+    fetchRezervacie()
+  }, [])
 
   async function odoslatZiadost() {
     if (!meno || !email || !telefon || !datum || !casOd || !casDo || !ucel) {
@@ -104,6 +134,13 @@ export default function PrenajomScreen() {
             <Text style={styles.infoText}>Cena: od 15€/hod (pre obyvateľov obce)</Text>
           </View>
         </View>
+
+        {/* VOĽNÝ KALENDÁR */}
+        <KalendarObsadenosti
+          rezervacie={rezervacie}
+          vybranyDatum={datum}
+          onPick={(iso) => setDatum(iso)}
+        />
 
         <View style={styles.content}>
 
@@ -190,6 +227,268 @@ export default function PrenajomScreen() {
     </SafeAreaView>
   )
 }
+
+// ─── Kalendár obsadenosti haly ──────────────────────────────────────────────
+function KalendarObsadenosti({
+  rezervacie,
+  vybranyDatum,
+  onPick,
+}: {
+  rezervacie: Rezervacia[]
+  vybranyDatum: string
+  onPick: (iso: string) => void
+}) {
+  const [zobrazeny, setZobrazeny] = useState(new Date())
+
+  // Group rezervacie po dni
+  const podlaDna = useMemo(() => {
+    const m: Record<string, Rezervacia[]> = {}
+    rezervacie.forEach(r => {
+      if (!m[r.datum]) m[r.datum] = []
+      m[r.datum].push(r)
+    })
+    return m
+  }, [rezervacie])
+
+  const rok = zobrazeny.getFullYear()
+  const mesiac = zobrazeny.getMonth()
+  const prvyDen = new Date(rok, mesiac, 1)
+  const dniVMesiaci = new Date(rok, mesiac + 1, 0).getDate()
+  const startDay = (prvyDen.getDay() + 6) % 7
+  const dnes = new Date()
+  const dnesKey = dnes.toISOString().split('T')[0]
+
+  function keyFor(d: number) {
+    // Lokálny dátum bez UTC offsetu
+    const mm = String(mesiac + 1).padStart(2, '0')
+    const dd = String(d).padStart(2, '0')
+    return `${rok}-${mm}-${dd}`
+  }
+
+  const cells: (number | null)[] = []
+  for (let i = 0; i < startDay; i++) cells.push(null)
+  for (let d = 1; d <= dniVMesiaci; d++) cells.push(d)
+  while (cells.length % 7 !== 0) cells.push(null)
+
+  const obsadenoVMesiaci = Object.entries(podlaDna).filter(([key]) => {
+    const d = new Date(key)
+    return d.getFullYear() === rok && d.getMonth() === mesiac
+  }).length
+
+  return (
+    <View style={kalStyles.box}>
+      {/* Header */}
+      <View style={kalStyles.head}>
+        <Text style={kalStyles.title}>📅 Voľný kalendár haly</Text>
+        <Text style={kalStyles.sub}>
+          {obsadenoVMesiaci === 0
+            ? 'V tomto mesiaci sú všetky dni voľné'
+            : `Obsadených dní v mesiaci: ${obsadenoVMesiaci}`}
+        </Text>
+      </View>
+
+      {/* Mesiac navigátor */}
+      <View style={kalStyles.nav}>
+        <TouchableOpacity
+          style={kalStyles.navBtn}
+          onPress={() => setZobrazeny(new Date(rok, mesiac - 1, 1))}
+        >
+          <Text style={kalStyles.navTxt}>←</Text>
+        </TouchableOpacity>
+        <Text style={kalStyles.monthTitle}>{MESIACE_SK[mesiac]} {rok}</Text>
+        <TouchableOpacity
+          style={kalStyles.navBtn}
+          onPress={() => setZobrazeny(new Date(rok, mesiac + 1, 1))}
+        >
+          <Text style={kalStyles.navTxt}>→</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Dni hlavička */}
+      <View style={kalStyles.weekHeader}>
+        {['Po', 'Ut', 'St', 'Št', 'Pi', 'So', 'Ne'].map(d => (
+          <Text key={d} style={kalStyles.weekDay}>{d}</Text>
+        ))}
+      </View>
+
+      {/* Grid */}
+      <View style={kalStyles.grid}>
+        {cells.map((d, idx) => {
+          if (d === null) return <View key={idx} style={kalStyles.cell} />
+          const key = keyFor(d)
+          const rez = podlaDna[key] ?? []
+          const isObsadene = rez.length > 0
+          const isToday = key === dnesKey
+          const isSelected = vybranyDatum === key
+          const isPast = key < dnesKey
+          return (
+            <View key={idx} style={kalStyles.cell}>
+              <TouchableOpacity
+                style={[
+                  kalStyles.cellInner,
+                  isObsadene && kalStyles.cellObsadene,
+                  isToday && !isObsadene && kalStyles.cellToday,
+                  isSelected && kalStyles.cellSelected,
+                  isPast && kalStyles.cellPast,
+                ]}
+                activeOpacity={isPast ? 1 : 0.7}
+                disabled={isPast}
+                onPress={() => onPick(key)}
+              >
+                <Text style={[
+                  kalStyles.dayNum,
+                  isObsadene && kalStyles.dayNumOnColor,
+                  isToday && !isObsadene && kalStyles.dayNumToday,
+                  isPast && kalStyles.dayNumPast,
+                ]}>
+                  {d}
+                </Text>
+                {isObsadene && (
+                  <Text style={kalStyles.casLabel} numberOfLines={1}>
+                    {rez[0].cas_od}–{rez[0].cas_do}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )
+        })}
+      </View>
+
+      {/* Legenda */}
+      <View style={kalStyles.legenda}>
+        <LegendaItem color={C.secondary} label="Voľné" />
+        <LegendaItem color={C.brand.red} label="Obsadené" />
+        <LegendaItem color={C.accent} label="Vybraté" />
+      </View>
+
+      {/* Hint */}
+      <Text style={kalStyles.hint}>
+        💡 Klikni na voľný deň pre predvyplnenie do formulára nižšie.
+      </Text>
+    </View>
+  )
+}
+
+function LegendaItem({ color, label }: { color: string; label: string }) {
+  return (
+    <View style={kalStyles.legRow}>
+      <View style={[kalStyles.legDot, { backgroundColor: color }]} />
+      <Text style={kalStyles.legText}>{label}</Text>
+    </View>
+  )
+}
+
+const kalStyles = StyleSheet.create({
+  box: {
+    margin: 16, marginTop: 0,
+    backgroundColor: C.surface,
+    borderRadius: 14,
+    padding: 12,
+    shadowColor: C.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  head: { paddingHorizontal: 4, marginBottom: 8 },
+  title: { fontSize: 15, fontWeight: '800', color: C.text },
+  sub: { fontSize: 12, color: C.textMuted, marginTop: 2 },
+
+  nav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4, marginBottom: 8,
+  },
+  navBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: C.surfaceAlt,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  navTxt: { fontSize: 16, fontWeight: '900', color: C.primary },
+  monthTitle: { fontSize: 15, fontWeight: '800', color: C.text },
+
+  weekHeader: {
+    flexDirection: 'row',
+    paddingHorizontal: 2,
+    marginBottom: 4,
+  },
+  weekDay: {
+    flex: 1, textAlign: 'center',
+    fontSize: 11, fontWeight: '800', color: C.textSecondary,
+  },
+
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  cell: {
+    width: `${100 / 7}%`,
+    padding: 1.5,
+  },
+  cellInner: {
+    aspectRatio: 1,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: C.secondaryLight,
+    borderWidth: 1,
+    borderColor: C.secondary + '40',
+  },
+  cellObsadene: {
+    backgroundColor: C.brand.red,
+    borderColor: C.brand.redDark,
+  },
+  cellToday: {
+    backgroundColor: C.primaryLight,
+    borderColor: C.primary,
+  },
+  cellSelected: {
+    backgroundColor: C.accentLight,
+    borderColor: C.accent,
+    borderWidth: 2,
+  },
+  cellPast: {
+    backgroundColor: C.surfaceAlt,
+    borderColor: 'transparent',
+    opacity: 0.5,
+  },
+  dayNum: {
+    fontSize: 13, fontWeight: '700', color: C.secondaryDark,
+  },
+  dayNumOnColor: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+  },
+  dayNumToday: { color: C.primary, fontWeight: '900' },
+  dayNumPast: { color: C.textPlaceholder },
+  casLabel: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '700',
+    marginTop: 1,
+    paddingHorizontal: 2,
+  },
+
+  legenda: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-around',
+    paddingTop: 10,
+    paddingBottom: 4,
+    borderTopWidth: 1,
+    borderTopColor: C.divider,
+    marginTop: 4,
+  },
+  legRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legDot: { width: 10, height: 10, borderRadius: 5 },
+  legText: { fontSize: 11, color: C.textSecondary, fontWeight: '600' },
+
+  hint: {
+    fontSize: 11, color: C.textMuted,
+    textAlign: 'center', marginTop: 8, lineHeight: 16,
+  },
+})
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.background },
