@@ -13,6 +13,12 @@ export type Zariadenie = {
   jednotka: string | null
   lat: number | null
   lng: number | null
+  // Meteo / kvalita vzduchu — voliteľné polia, ktoré dáva senzor typu 'meteo'
+  aqi?: number | null            // European AQI
+  pm25?: number | null           // µg/m³
+  pm10?: number | null           // µg/m³
+  teplota?: number | null        // °C
+  vlhkost?: number | null        // %
   updated_at: string
 }
 

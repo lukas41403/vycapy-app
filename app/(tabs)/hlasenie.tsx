@@ -8,8 +8,11 @@
  */
 
 import { AppHeader } from '@/components/AppHeader'
+import { Badge, Button } from '@/components/ui'
 import { C } from '@/constants/colors'
+import { useTenant } from '@/src/config/tenant'
 import { supabase } from '@/src/lib/supabase'
+import { spacing } from '@/src/theme/tokens'
 import { Image } from 'expo-image'
 // ── expo-image-picker ─────────────────────────────────────────────────────
 // Akonáhle spustíš `npx expo install expo-image-picker expo-media-library`,
@@ -17,6 +20,7 @@ import { Image } from 'expo-image'
 // import * as ImagePicker from 'expo-image-picker'
 const ImagePicker: any = null
 // ──────────────────────────────────────────────────────────────────────────
+import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import {
   ActivityIndicator,
@@ -29,26 +33,23 @@ import {
   View,
 } from 'react-native'
 
-const KATEGORIE = [
-  { id: 'cesta', label: 'Cesta / chodník', emoji: '🛣️' },
-  { id: 'osvietenie', label: 'Verejné osvetlenie', emoji: '💡' },
-  { id: 'zelen', label: 'Zeleň / stromy', emoji: '🌳' },
-  { id: 'voda', label: 'Voda / kanalizácia', emoji: '💧' },
-  { id: 'odpad', label: 'Odpad / kontajnery', emoji: '🗑️' },
-  { id: 'ine', label: 'Iné', emoji: '📋' },
-]
-
 const MAX_FOTIEK = 3
 const STORAGE_BUCKET = 'hlaseniafotos'
 
 export default function HlasenieScreen() {
+  const tenant = useTenant()
+  const router = useRouter()
+  const KATEGORIE = tenant.kategoriePodnetov
+  const [nazov, setNazov] = useState('')                  // Názov problému (nová položka — TOP priorita)
   const [kategoria, setKategoria] = useState<string | null>(null)
   const [popis, setPopis] = useState('')
   const [adresa, setAdresa] = useState('')
+  const [kontakt, setKontakt] = useState('')              // Voliteľný kontakt
   const [fotky, setFotky] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [uploadingPct, setUploadingPct] = useState<number | null>(null)
   const [odoslane, setOdoslane] = useState(false)
+  const [trackingId, setTrackingId] = useState<string | null>(null)
 
   // ── Foto handlery ─────────────────────────────────────────────────────────
   function picker_unavailable() {
@@ -126,10 +127,14 @@ export default function HlasenieScreen() {
     return urls
   }
 
-  // ── Odoslanie hlásenia ────────────────────────────────────────────────────
+  // ── Odoslanie podnetu ────────────────────────────────────────────────────
   async function odoslatHlasenie() {
     if (!kategoria) {
-      Alert.alert('Chýba kategória', 'Prosím vyberte kategóriu poruchy.')
+      Alert.alert('Chýba kategória', 'Prosím vyberte kategóriu podnetu.')
+      return
+    }
+    if (nazov.trim().length < 3) {
+      Alert.alert('Krátky názov', 'Názov problému musí mať aspoň 3 znaky.')
       return
     }
     if (popis.trim().length < 10) {
@@ -141,31 +146,46 @@ export default function HlasenieScreen() {
 
     const fotoUrls = await uploadFotiek()
 
-    const { error } = await supabase
+    // Defenzívne ukladanie: ak DB ešte neobsahuje stĺpce `nazov` / `kontakt`,
+    // skomponujeme všetko do existujúceho `popis` poľa (názov ako prvý riadok).
+    const popisKomplet = [
+      `**${nazov.trim()}**`,
+      '',
+      popis.trim(),
+      kontakt.trim() ? `\n📧 Kontakt: ${kontakt.trim()}` : '',
+    ].join('\n').trim()
+
+    const { data, error } = await supabase
       .from('hlaseniaporuchy')
       .insert({
         kategoria,
-        popis: popis.trim(),
+        popis: popisKomplet,
         adresa: adresa.trim() || null,
         foto_urls: fotoUrls.length > 0 ? fotoUrls : null,
         status: 'nove',
       })
+      .select('id')
+      .single()
 
     setLoading(false)
 
     if (error) {
-      Alert.alert('Chyba', 'Hlásenie sa nepodarilo odoslať. Skúste znova.\n\n' + error.message)
+      Alert.alert('Chyba', 'Podnet sa nepodarilo odoslať. Skúste znova.\n\n' + error.message)
     } else {
+      setTrackingId((data as any)?.id ?? null)
       setOdoslane(true)
     }
   }
 
   function resetForm() {
+    setNazov('')
     setKategoria(null)
     setPopis('')
     setAdresa('')
+    setKontakt('')
     setFotky([])
     setOdoslane(false)
+    setTrackingId(null)
   }
 
   if (odoslane) {
@@ -173,13 +193,24 @@ export default function HlasenieScreen() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.successContainer}>
           <Text style={styles.successEmoji}>✅</Text>
-          <Text style={styles.successTitle}>Hlásenie odoslané!</Text>
+          <Text style={styles.successTitle}>Podnet odoslaný!</Text>
           <Text style={styles.successText}>
-            Vaše hlásenie bolo úspešne prijaté. Obecný úrad ho preverí a bude vás kontaktovať.
+            Vaše hlásenie bolo úspešne prijaté. {tenant.obecnyUrad.nazov} ho preverí
+            a bude vás kontaktovať{kontakt.trim() ? '' : ' (ak ste zadali kontakt)'}.
           </Text>
-          <TouchableOpacity style={styles.resetBtn} onPress={resetForm}>
-            <Text style={styles.resetBtnText}>Podať ďalšie hlásenie</Text>
-          </TouchableOpacity>
+          {trackingId && (
+            <View style={styles.trackingBox}>
+              <Text style={styles.trackingLabel}>VAŠE ČÍSLO PODNETU</Text>
+              <Text style={styles.trackingId}>{trackingId.slice(0, 8).toUpperCase()}</Text>
+              <Text style={styles.trackingHint}>
+                Stav podnetu sa zmení na „v riešení" a „vyriešené" v aplikácii.
+              </Text>
+            </View>
+          )}
+          <View style={{ gap: spacing.sm, alignSelf: 'stretch', paddingHorizontal: spacing.xl }}>
+            <Button title="Podať ďalší podnet" onPress={resetForm} variant="secondary" fullWidth />
+            <Button title="Späť na hlavnú" onPress={() => router.push('/' as never)} variant="ghost" fullWidth />
+          </View>
         </View>
       </SafeAreaView>
     )
@@ -190,12 +221,20 @@ export default function HlasenieScreen() {
       <StatusBar barStyle="dark-content" backgroundColor={C.surface} />
       <ScrollView showsVerticalScrollIndicator={false}>
 
-        <AppHeader title="Hlásenie porúch" subtitle="Nahláste problém obecnému úradu" />
+        <AppHeader title="Nahlásiť podnet" subtitle="Odfoťte problém v obci a obec ho rieši" />
 
         <View style={styles.content}>
 
+          {/* Stepper hint */}
+          <View style={styles.stepperBox}>
+            <Badge label="1. KATEGÓRIA" tone="brand" />
+            <Badge label="2. POPIS" tone="neutral" />
+            <Badge label="3. FOTKA" tone="neutral" />
+            <Badge label="4. POSLAŤ" tone="neutral" />
+          </View>
+
           {/* KATEGÓRIA */}
-          <Text style={styles.label}>Kategória poruchy *</Text>
+          <Text style={styles.label}>Kategória podnetu *</Text>
           <View style={styles.kategorieGrid}>
             {KATEGORIE.map((k) => (
               <TouchableOpacity
@@ -203,6 +242,9 @@ export default function HlasenieScreen() {
                 style={[styles.kategoriaCard, kategoria === k.id && styles.kategoriaCardActive]}
                 onPress={() => setKategoria(k.id)}
                 activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={k.label}
+                accessibilityState={{ selected: kategoria === k.id }}
               >
                 <Text style={styles.kategoriaEmoji}>{k.emoji}</Text>
                 <Text style={[styles.kategoriaLabel, kategoria === k.id && styles.kategoriaLabelActive]}>
@@ -212,6 +254,18 @@ export default function HlasenieScreen() {
             ))}
           </View>
 
+          {/* NÁZOV PROBLÉMU (nové pole) */}
+          <Text style={styles.label}>Názov problému *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="napr. Rozbitá lampa pred kostolom"
+            placeholderTextColor={C.textPlaceholder}
+            value={nazov}
+            onChangeText={setNazov}
+            maxLength={80}
+            accessibilityLabel="Názov problému"
+          />
+
           {/* ADRESA */}
           <Text style={styles.label}>Miesto / adresa</Text>
           <TextInput
@@ -220,10 +274,11 @@ export default function HlasenieScreen() {
             placeholderTextColor={C.textPlaceholder}
             value={adresa}
             onChangeText={setAdresa}
+            accessibilityLabel="Miesto alebo adresa"
           />
 
           {/* POPIS */}
-          <Text style={styles.label}>Popis poruchy *</Text>
+          <Text style={styles.label}>Popis problému *</Text>
           <TextInput
             style={[styles.input, styles.textArea]}
             placeholder="Opíšte problém čo najpresnejšie..."
@@ -233,8 +288,25 @@ export default function HlasenieScreen() {
             multiline
             numberOfLines={5}
             textAlignVertical="top"
+            accessibilityLabel="Popis problému"
           />
           <Text style={styles.charCount}>{popis.length} znakov</Text>
+
+          {/* KONTAKT (voliteľné) */}
+          <Text style={styles.label}>Kontakt (voliteľné)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="email alebo telefón pre spätnú väzbu"
+            placeholderTextColor={C.textPlaceholder}
+            value={kontakt}
+            onChangeText={setKontakt}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            accessibilityLabel="Kontaktný údaj"
+          />
+          <Text style={styles.kontaktHint}>
+            Ak zadáte kontakt, úrad vás môže informovať o riešení.
+          </Text>
 
           {/* FOTKY */}
           <Text style={styles.label}>Fotky (voliteľné, max {MAX_FOTIEK})</Text>
@@ -377,4 +449,41 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   resetBtnText: { color: C.onPrimary, fontSize: 15, fontWeight: '700' },
+
+  // Stepper a tracking
+  stepperBox: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: spacing.md,
+  },
+  kontaktHint: {
+    fontSize: 12,
+    color: C.textMuted,
+    marginTop: 4,
+    lineHeight: 17,
+  },
+  trackingBox: {
+    backgroundColor: C.surfaceAlt,
+    borderRadius: 14,
+    padding: 16,
+    alignItems: 'center',
+    marginVertical: 8,
+    alignSelf: 'stretch',
+    marginHorizontal: 24,
+    borderWidth: 1.5,
+    borderColor: C.border,
+    borderStyle: 'dashed',
+  },
+  trackingLabel: {
+    fontSize: 10, fontWeight: '800', color: C.textMuted,
+    letterSpacing: 1, marginBottom: 4,
+  },
+  trackingId: {
+    fontSize: 22, fontWeight: '900', color: C.primary,
+    letterSpacing: 2, marginBottom: 6,
+  },
+  trackingHint: {
+    fontSize: 11, color: C.textMuted, textAlign: 'center', lineHeight: 16,
+  },
 })

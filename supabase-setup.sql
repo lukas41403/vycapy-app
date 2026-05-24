@@ -255,6 +255,56 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 
 -- ════════════════════════════════════════════════════════════════════════
+-- GPS súradnice pre mapu obce (pridáva sa idempotentne)
+-- ════════════════════════════════════════════════════════════════════════
+ALTER TABLE public.hlaseniaporuchy
+  ADD COLUMN IF NOT EXISTS lat numeric(9,6),
+  ADD COLUMN IF NOT EXISTS lng numeric(9,6);
+
+ALTER TABLE public.obecne_zariadenia
+  ADD COLUMN IF NOT EXISTS lat numeric(9,6),
+  ADD COLUMN IF NOT EXISTS lng numeric(9,6),
+  ADD COLUMN IF NOT EXISTS aqi numeric(5,1),       -- European AQI 0-100+
+  ADD COLUMN IF NOT EXISTS pm25 numeric(6,2),      -- µg/m³
+  ADD COLUMN IF NOT EXISTS pm10 numeric(6,2),      -- µg/m³
+  ADD COLUMN IF NOT EXISTS teplota numeric(4,1),   -- °C
+  ADD COLUMN IF NOT EXISTS vlhkost numeric(4,1);   -- %
+
+-- Pridať CHECK pre nový typ "meteo" — niektoré inštalácie nepodporujú CHECK,
+-- preto je to defenzívne. Ak ešte nemáte typ "meteo" v dáta, môžete ho
+-- doplniť ako nový riadok cez Supabase Table editor.
+
+-- ════════════════════════════════════════════════════════════════════════
+-- FARSKÉ OZNAMY — omše, smútočné, krsty, sobáše, ohlášky
+-- ════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.farske_oznamy (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  typ text NOT NULL CHECK (typ IN ('omsa','smutok','krst','sobas','ohlaska','oznam')),
+  nazov text NOT NULL,
+  popis text,
+  datum_od timestamptz,
+  datum_do timestamptz,
+  miesto text DEFAULT 'Kostol Výčapy-Opatovce',
+  je_aktivny boolean DEFAULT true,
+  created_at timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS farske_oznamy_typ_idx ON public.farske_oznamy(typ);
+CREATE INDEX IF NOT EXISTS farske_oznamy_datum_idx ON public.farske_oznamy(datum_od);
+ALTER TABLE public.farske_oznamy ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  CREATE POLICY "farske_read" ON public.farske_oznamy FOR SELECT USING (je_aktivny = true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "farske_write_ins" ON public.farske_oznamy FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "farske_write_upd" ON public.farske_oznamy FOR UPDATE USING (auth.role() = 'authenticated');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "farske_write_del" ON public.farske_oznamy FOR DELETE USING (auth.role() = 'authenticated');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ════════════════════════════════════════════════════════════════════════
 -- HOTOVO! Pre kontrolu: tabuľky a buckety
 SELECT 'ankety' AS t, count(*) FROM public.ankety
 UNION ALL SELECT 'hlasy', count(*) FROM public.hlasy
@@ -262,5 +312,6 @@ UNION ALL SELECT 'ai_konverzacie', count(*) FROM public.ai_konverzacie
 UNION ALL SELECT 'obecne_zariadenia', count(*) FROM public.obecne_zariadenia
 UNION ALL SELECT 'fc_hraci', count(*) FROM public.fc_hraci
 UNION ALL SELECT 'fc_zapasy', count(*) FROM public.fc_zapasy
-UNION ALL SELECT 'push_tokens', count(*) FROM public.push_tokens;
+UNION ALL SELECT 'push_tokens', count(*) FROM public.push_tokens
+UNION ALL SELECT 'farske_oznamy', count(*) FROM public.farske_oznamy;
 -- ════════════════════════════════════════════════════════════════════════

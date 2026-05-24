@@ -118,7 +118,7 @@ const PODUJATIE_KATEGORIE = [
 ]
 
 export default function AdminScreen() {
-  const [aktTab, setAktTab] = useState<'hlasenia' | 'aktuality' | 'podujatia' | 'prenajmy' | 'ankety'>('hlasenia')
+  const [aktTab, setAktTab] = useState<'prehlad' | 'hlasenia' | 'aktuality' | 'podujatia' | 'prenajmy' | 'ankety' | 'farske'>('prehlad')
   const [hlasenia, setHlasenia] = useState<Hlasenie[]>([])
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
@@ -205,7 +205,23 @@ export default function AdminScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.taby}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.taby}
+        contentContainerStyle={{ flexGrow: 1 }}
+      >
+        <TouchableOpacity
+          style={[styles.tab, aktTab === 'prehlad' && styles.tabActive]}
+          onPress={() => setAktTab('prehlad')}
+        >
+          <Text
+            style={[styles.tabText, aktTab === 'prehlad' && styles.tabTextActive]}
+            numberOfLines={1}
+          >
+            📊 Prehľad
+          </Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, aktTab === 'hlasenia' && styles.tabActive]}
           onPress={() => setAktTab('hlasenia')}
@@ -214,7 +230,7 @@ export default function AdminScreen() {
             style={[styles.tabText, aktTab === 'hlasenia' && styles.tabTextActive]}
             numberOfLines={1}
           >
-            ⚠️ Hlásenia{nove.length > 0 ? ` (${nove.length})` : ''}
+            ⚠️ Podnety{nove.length > 0 ? ` (${nove.length})` : ''}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -261,9 +277,22 @@ export default function AdminScreen() {
             🗳️ Ankety
           </Text>
         </TouchableOpacity>
-      </View>
+        <TouchableOpacity
+          style={[styles.tab, aktTab === 'farske' && styles.tabActive]}
+          onPress={() => setAktTab('farske')}
+        >
+          <Text
+            style={[styles.tabText, aktTab === 'farske' && styles.tabTextActive]}
+            numberOfLines={1}
+          >
+            ⛪ Fara
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
 
-      {aktTab === 'hlasenia' ? (
+      {aktTab === 'prehlad' ? (
+        <AdminDashboard hlasenia={hlasenia} onGoTab={(tab) => setAktTab(tab as any)} />
+      ) : aktTab === 'hlasenia' ? (
         loading ? (
           <View style={styles.center}>
             <ActivityIndicator size="large" color={C.primary} />
@@ -300,8 +329,10 @@ export default function AdminScreen() {
         <NovePodujatieForm />
       ) : aktTab === 'prenajmy' ? (
         <PrenajmyZoznam />
-      ) : (
+      ) : aktTab === 'ankety' ? (
         <AnketyAdminPanel />
+      ) : (
+        <FarskeOznamyAdmin />
       )}
     </SafeAreaView>
   )
@@ -1161,6 +1192,486 @@ function HlasenieKarta({ hlasenie: h, updating, onZmenStatus }: {
   )
 }
 
+// ─── FARSKÉ OZNAMY — admin podtab ─────────────────────────────────────────
+function FarskeOznamyAdmin() {
+  const [podtab, setPodtab] = useState<'nova' | 'zoznam'>('nova')
+  const [typ, setTyp] = useState<'omsa' | 'smutok' | 'krst' | 'sobas' | 'ohlaska' | 'oznam'>('omsa')
+  const [nazov, setNazov] = useState('')
+  const [popis, setPopis] = useState('')
+  const [datumOd, setDatumOd] = useState('')
+  const [cas, setCas] = useState('')
+  const [miesto, setMiesto] = useState('Kostol Výčapy-Opatovce')
+  const [loading, setLoading] = useState(false)
+  const [zoznam, setZoznam] = useState<any[]>([])
+  const [nacitavam, setNacitavam] = useState(false)
+  const [chyba, setChyba] = useState<string | null>(null)
+
+  const TYPY_LABEL: Record<string, string> = {
+    omsa: '🙏 Sv. omša',
+    smutok: '🕯️ Smútočný',
+    krst: '👶 Krst',
+    sobas: '💒 Sobáš',
+    ohlaska: '📣 Ohláška',
+    oznam: '📋 Oznam',
+  }
+
+  async function nacitajZoznam() {
+    setNacitavam(true)
+    setChyba(null)
+    const { data, error } = await supabase
+      .from('farske_oznamy')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50)
+    if (error) {
+      setChyba(error.message)
+    } else {
+      setZoznam(data || [])
+    }
+    setNacitavam(false)
+  }
+
+  async function vytvor() {
+    if (nazov.trim().length < 3) {
+      Alert.alert('Krátky názov', 'Názov musí mať aspoň 3 znaky.')
+      return
+    }
+    setLoading(true)
+    let datumIso: string | null = null
+    if (datumOd) {
+      try {
+        datumIso = new Date(`${datumOd}T${cas || '00:00'}:00`).toISOString()
+      } catch {}
+    }
+    const { error } = await supabase.from('farske_oznamy').insert({
+      typ,
+      nazov: nazov.trim(),
+      popis: popis.trim() || null,
+      datum_od: datumIso,
+      miesto: miesto.trim() || null,
+      je_aktivny: true,
+    })
+    setLoading(false)
+    if (error) {
+      Alert.alert(
+        'Chyba',
+        'Oznam sa nepodarilo uložiť.\n\n' + error.message +
+        '\n\nTip: skontrolujte že tabuľka `farske_oznamy` existuje v Supabase (SQL skript je v useFarskeOznamy.ts).',
+      )
+    } else {
+      Alert.alert('Hotovo!', 'Farský oznam bol pridaný.')
+      setNazov(''); setPopis(''); setDatumOd(''); setCas('')
+    }
+  }
+
+  async function zmaz(id: string) {
+    Alert.alert('Zmazať oznam?', 'Túto akciu nemožno vrátiť.', [
+      { text: 'Zrušiť', style: 'cancel' },
+      {
+        text: 'Zmazať', style: 'destructive',
+        onPress: async () => {
+          await supabase.from('farske_oznamy').delete().eq('id', id)
+          nacitajZoznam()
+        },
+      },
+    ])
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={styles.podtaby}>
+        <TouchableOpacity
+          style={[styles.podtab, podtab === 'nova' && styles.podtabActive]}
+          onPress={() => setPodtab('nova')}
+        >
+          <Text style={[styles.podtabText, podtab === 'nova' && styles.podtabTextActive]}>
+            ✍️ Nový oznam
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.podtab, podtab === 'zoznam' && styles.podtabActive]}
+          onPress={() => { setPodtab('zoznam'); nacitajZoznam() }}
+        >
+          <Text style={[styles.podtabText, podtab === 'zoznam' && styles.podtabTextActive]}>
+            📋 Zoznam
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {podtab === 'nova' ? (
+        <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+          <View style={styles.formCard}>
+            <Text style={styles.formLabel}>Typ oznamu</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {Object.entries(TYPY_LABEL).map(([k, label]) => (
+                  <TouchableOpacity
+                    key={k}
+                    style={[styles.katBtn, typ === k && styles.katBtnActive]}
+                    onPress={() => setTyp(k as any)}
+                  >
+                    <Text style={[styles.katBtnText, typ === k && styles.katBtnTextActive]}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+
+            <Text style={styles.formLabel}>Názov *</Text>
+            <TextInput style={styles.input}
+              placeholder={typ === 'smutok' ? 'napr. Zomrel Ján Novák' : typ === 'sobas' ? 'napr. Sobáš Peter & Mária' : 'napr. Sobotná sv. omša'}
+              placeholderTextColor={C.textPlaceholder}
+              value={nazov} onChangeText={setNazov} />
+
+            <Text style={styles.formLabel}>Dátum (RRRR-MM-DD)</Text>
+            <TextInput style={styles.input} placeholder="2026-06-15"
+              placeholderTextColor={C.textPlaceholder} value={datumOd} onChangeText={setDatumOd} />
+
+            <Text style={styles.formLabel}>Čas (HH:MM)</Text>
+            <TextInput style={styles.input} placeholder="18:00"
+              placeholderTextColor={C.textPlaceholder} value={cas} onChangeText={setCas} />
+
+            <Text style={styles.formLabel}>Miesto</Text>
+            <TextInput style={styles.input} placeholder="Kostol Výčapy-Opatovce"
+              placeholderTextColor={C.textPlaceholder} value={miesto} onChangeText={setMiesto} />
+
+            <Text style={styles.formLabel}>Popis / detail</Text>
+            <TextInput style={[styles.input, { height: 120 }]}
+              placeholder={typ === 'smutok' ? 'Vek, dátum a miesto pohrebu...' : 'Detaily oznamu...'}
+              placeholderTextColor={C.textPlaceholder} value={popis} onChangeText={setPopis}
+              multiline textAlignVertical="top" />
+
+            <TouchableOpacity
+              style={[styles.submitBtn, loading && { opacity: 0.6 }]}
+              onPress={vytvor} disabled={loading}
+            >
+              {loading
+                ? <ActivityIndicator color={C.onPrimary} />
+                : <Text style={styles.submitBtnText}>⛪ Uverejniť oznam</Text>}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      ) : (
+        <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+          {nacitavam && <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }} />}
+          {chyba && (
+            <View style={[styles.formCard, { borderLeftWidth: 4, borderLeftColor: C.primary }]}>
+              <Text style={[styles.formLabel, { color: C.primary }]}>Tabuľka neexistuje</Text>
+              <Text style={{ fontSize: 13, color: C.textSecondary, lineHeight: 19 }}>
+                {chyba}
+              </Text>
+              <Text style={{ fontSize: 12, color: C.textMuted, marginTop: 8, lineHeight: 18 }}>
+                Tip: spustite SQL skript zo súboru `src/hooks/useFarskeOznamy.ts` v Supabase SQL editore.
+              </Text>
+            </View>
+          )}
+          {!nacitavam && !chyba && zoznam.length === 0 && (
+            <View style={styles.empty}>
+              <Text style={styles.emptyEmoji}>⛪</Text>
+              <Text style={styles.emptyText}>Žiadne farské oznamy</Text>
+            </View>
+          )}
+          {!nacitavam && zoznam.map(o => (
+            <View key={o.id} style={styles.karta}>
+              <View style={styles.kartaHeader}>
+                <View style={styles.kartaInfo}>
+                  <Text style={styles.kartaKategoria}>
+                    {TYPY_LABEL[o.typ]?.toUpperCase() ?? o.typ.toUpperCase()}
+                  </Text>
+                  <Text style={styles.kartaPopis} numberOfLines={2}>{o.nazov}</Text>
+                </View>
+                <View style={[
+                  styles.statusBadge,
+                  { backgroundColor: o.je_aktivny ? C.status.success.bg : C.status.neutral.bg }
+                ]}>
+                  <Text style={[styles.statusText, {
+                    color: o.je_aktivny ? C.status.success.fg : C.status.neutral.fg
+                  }]}>
+                    {o.je_aktivny ? 'Aktívny' : 'Skrytý'}
+                  </Text>
+                </View>
+              </View>
+              {o.datum_od && (
+                <Text style={styles.kartaDatum}>
+                  📅 {new Date(o.datum_od).toLocaleDateString('sk-SK', {
+                    weekday: 'short', day: 'numeric', month: 'long',
+                    hour: '2-digit', minute: '2-digit',
+                  })}
+                </Text>
+              )}
+              {o.popis && (
+                <Text style={[styles.kartaDatum, { color: C.textSecondary, marginTop: 6 }]} numberOfLines={3}>
+                  {o.popis}
+                </Text>
+              )}
+              <TouchableOpacity
+                style={[styles.akciaBtn, { backgroundColor: C.status.danger.bg, marginTop: 10, alignSelf: 'flex-start' }]}
+                onPress={() => zmaz(o.id)}
+              >
+                <Text style={[styles.akciaBtnText, { color: C.status.danger.fg }]}>🗑️ Zmazať</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </ScrollView>
+      )}
+    </View>
+  )
+}
+
+// ─── ADMIN DASHBOARD — KPI prehľad navrchu ────────────────────────────────
+function AdminDashboard({
+  hlasenia,
+  onGoTab,
+}: {
+  hlasenia: Hlasenie[]
+  onGoTab: (tab: string) => void
+}) {
+  const [aktualityCount, setAktualityCount] = useState<number | null>(null)
+  const [najblizsiVyvoz, setNajblizsiVyvoz] = useState<{ typ: string; datum: string } | null>(null)
+  const [posledneOtazky, setPosledneOtazky] = useState<{ obsah: string; created_at: string }[]>([])
+
+  useEffect(() => {
+    nacitaj()
+  }, [])
+
+  async function nacitaj() {
+    const today = new Date().toISOString().split('T')[0]
+
+    // Počet publikovaných aktualít
+    const { count: aktCount } = await supabase
+      .from('aktuality')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_published', true)
+    setAktualityCount(aktCount ?? 0)
+
+    // Najbližší vývoz
+    const { data: odpadData } = await supabase
+      .from('odpady_kalendar')
+      .select('datum, typ:odpady_typy(nazov)')
+      .gte('datum', today)
+      .order('datum', { ascending: true })
+      .limit(1)
+    const first = (odpadData as any)?.[0]
+    if (first) {
+      setNajblizsiVyvoz({ typ: first.typ?.nazov ?? 'Odpad', datum: first.datum })
+    }
+
+    // Posledné 3 Marta otázky (rola=user)
+    const { data: konv } = await supabase
+      .from('ai_konverzacie')
+      .select('obsah, created_at')
+      .eq('rola', 'user')
+      .order('created_at', { ascending: false })
+      .limit(3)
+    setPosledneOtazky((konv as any) || [])
+  }
+
+  const aktivnePodnety = hlasenia.filter(h => h.status === 'nove' || h.status === 'v_rieseni').length
+  const novePodnety = hlasenia.filter(h => h.status === 'nove').length
+
+  const formatVyvoz = (datum: string) => {
+    const d = new Date(datum)
+    const dnes = new Date()
+    dnes.setHours(0,0,0,0); d.setHours(0,0,0,0)
+    const dni = Math.round((d.getTime() - dnes.getTime()) / 86400000)
+    if (dni === 0) return 'Dnes'
+    if (dni === 1) return 'Zajtra'
+    return `Za ${dni} dní`
+  }
+
+  return (
+    <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+      {/* Top KPI strip — 2x2 */}
+      <View style={dashStyles.kpiGrid}>
+        <TouchableOpacity
+          style={dashStyles.kpiCard}
+          activeOpacity={0.85}
+          onPress={() => onGoTab('hlasenia')}
+        >
+          <Text style={dashStyles.kpiEmoji}>⚠️</Text>
+          <Text style={[dashStyles.kpiNumber, novePodnety > 0 && { color: C.brand.red }]}>
+            {aktivnePodnety}
+          </Text>
+          <Text style={dashStyles.kpiLabel}>aktívnych podnetov</Text>
+          {novePodnety > 0 && (
+            <View style={dashStyles.kpiBadge}>
+              <Text style={dashStyles.kpiBadgeText}>{novePodnety} nových</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={dashStyles.kpiCard}
+          activeOpacity={0.85}
+          onPress={() => onGoTab('aktuality')}
+        >
+          <Text style={dashStyles.kpiEmoji}>📰</Text>
+          <Text style={dashStyles.kpiNumber}>{aktualityCount ?? '—'}</Text>
+          <Text style={dashStyles.kpiLabel}>publikovaných aktualít</Text>
+        </TouchableOpacity>
+
+        <View style={dashStyles.kpiCard}>
+          <Text style={dashStyles.kpiEmoji}>🗑️</Text>
+          <Text style={[dashStyles.kpiNumber, { fontSize: 18 }]}>
+            {najblizsiVyvoz ? formatVyvoz(najblizsiVyvoz.datum) : '—'}
+          </Text>
+          <Text style={dashStyles.kpiLabel}>{najblizsiVyvoz ? `vývoz: ${najblizsiVyvoz.typ}` : 'nie je naplánovaný'}</Text>
+        </View>
+
+        <TouchableOpacity
+          style={dashStyles.kpiCard}
+          activeOpacity={0.85}
+          onPress={() => onGoTab('aktuality')}
+        >
+          <Text style={dashStyles.kpiEmoji}>⚡</Text>
+          <Text style={[dashStyles.kpiNumber, { color: C.primary, fontSize: 18 }]}>+ Nové</Text>
+          <Text style={dashStyles.kpiLabel}>publikovať oznam</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Posledné Marta otázky */}
+      <View style={dashStyles.section}>
+        <Text style={dashStyles.sectionLabel}>POSLEDNÉ OTÁZKY PRE MARTU</Text>
+        {posledneOtazky.length === 0 ? (
+          <View style={dashStyles.emptyMini}>
+            <Text style={dashStyles.emptyMiniText}>
+              Zatiaľ žiadne otázky. Marta čaká na občanov.
+            </Text>
+          </View>
+        ) : (
+          posledneOtazky.map((q, i) => (
+            <View key={i} style={dashStyles.qBox}>
+              <Text style={dashStyles.qEmoji}>💬</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={dashStyles.qText} numberOfLines={2}>{q.obsah}</Text>
+                <Text style={dashStyles.qDate}>
+                  {new Date(q.created_at).toLocaleDateString('sk-SK', {
+                    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                  })}
+                </Text>
+              </View>
+            </View>
+          ))
+        )}
+      </View>
+
+      {/* Quick actions — 30s flow */}
+      <View style={dashStyles.section}>
+        <Text style={dashStyles.sectionLabel}>RÝCHLE AKCIE (do 30 sekúnd)</Text>
+        <TouchableOpacity style={dashStyles.quickRow} onPress={() => onGoTab('aktuality')}>
+          <Text style={dashStyles.quickEmoji}>📢</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={dashStyles.quickTitle}>Publikovať oznam</Text>
+            <Text style={dashStyles.quickSub}>Titulok + text → publish</Text>
+          </View>
+          <Text style={dashStyles.quickChevron}>›</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={dashStyles.quickRow} onPress={() => onGoTab('hlasenia')}>
+          <Text style={dashStyles.quickEmoji}>✅</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={dashStyles.quickTitle}>Vyriešiť podnet</Text>
+            <Text style={dashStyles.quickSub}>{novePodnety > 0 ? `${novePodnety} nových čaká` : 'Žiadne nové'}</Text>
+          </View>
+          <Text style={dashStyles.quickChevron}>›</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={dashStyles.quickRow} onPress={() => onGoTab('podujatia')}>
+          <Text style={dashStyles.quickEmoji}>📅</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={dashStyles.quickTitle}>Pridať podujatie</Text>
+            <Text style={dashStyles.quickSub}>Názov + dátum → save</Text>
+          </View>
+          <Text style={dashStyles.quickChevron}>›</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  )
+}
+
+const dashStyles = StyleSheet.create({
+  kpiGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 8,
+  },
+  kpiCard: {
+    flexBasis: '47%',
+    flexGrow: 1,
+    backgroundColor: C.surface,
+    borderRadius: 14,
+    padding: 14,
+    minHeight: 110,
+    shadowColor: C.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+    position: 'relative',
+  },
+  kpiEmoji: { fontSize: 22, marginBottom: 4 },
+  kpiNumber: { fontSize: 26, fontWeight: '900', color: C.text, letterSpacing: -0.5 },
+  kpiLabel: { fontSize: 11, color: C.textMuted, marginTop: 2, fontWeight: '600' },
+  kpiBadge: {
+    position: 'absolute', top: 10, right: 10,
+    backgroundColor: C.brand.red,
+    paddingHorizontal: 7, paddingVertical: 3,
+    borderRadius: 8,
+  },
+  kpiBadgeText: { color: '#FFF', fontSize: 10, fontWeight: '800' },
+
+  section: { marginTop: 16, gap: 8 },
+  sectionLabel: {
+    fontSize: 11, fontWeight: '800', color: C.textMuted,
+    letterSpacing: 0.8, marginBottom: 6,
+  },
+
+  qBox: {
+    flexDirection: 'row',
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    padding: 12,
+    gap: 10,
+    alignItems: 'flex-start',
+    shadowColor: C.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+    marginBottom: 6,
+  },
+  qEmoji: { fontSize: 18 },
+  qText: { fontSize: 13, color: C.text, lineHeight: 18, fontWeight: '500' },
+  qDate: { fontSize: 11, color: C.textPlaceholder, marginTop: 4 },
+
+  emptyMini: {
+    backgroundColor: C.surfaceAlt,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+  },
+  emptyMiniText: { fontSize: 12, color: C.textMuted, textAlign: 'center' },
+
+  quickRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    padding: 14,
+    gap: 12,
+    marginBottom: 6,
+    shadowColor: C.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  quickEmoji: { fontSize: 24 },
+  quickTitle: { fontSize: 14, fontWeight: '700', color: C.text },
+  quickSub: { fontSize: 11, color: C.textMuted, marginTop: 1 },
+  quickChevron: { fontSize: 24, color: C.textPlaceholder, fontWeight: '300' },
+})
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.background },
   header: {
@@ -1182,10 +1693,11 @@ const styles = StyleSheet.create({
   },
   logoutText: { color: C.onPrimary, fontSize: 13, fontWeight: '700' },
   taby: {
-    flexDirection: 'row', backgroundColor: C.surface,
+    backgroundColor: C.surface,
     borderBottomWidth: 1, borderBottomColor: C.borderLight,
+    maxHeight: 50,
   },
-  tab: { flex: 1, paddingVertical: 14, paddingHorizontal: 4, alignItems: 'center' },
+  tab: { paddingVertical: 14, paddingHorizontal: 16, alignItems: 'center' },
   tabActive: { borderBottomWidth: 3, borderBottomColor: C.primary },
   tabText: { fontSize: 11, fontWeight: '600', color: C.textMuted },
   tabTextActive: { color: C.primary, fontWeight: '700' },

@@ -1,24 +1,34 @@
 /**
- * Mapa obce — schematická obecná mapa s pinmi:
- *   - žltá  = verejné osvetlenie (zapnuté / vypnuté)
- *   - modrá = senzory (hladina, teplota, kontajner)
- *   - červená = nahlásené poruchy s adresou
+ * Mapa obce — REÁLNA mapa cez Leaflet + OpenStreetMap.
  *
- * Toto je schematická SVG-like reprezentácia bez real-time Google Maps —
- * netreba inštalovať react-native-maps ani API kľúč. Pre prezentáciu
- * starostovi a demo úplne stačí, vizuálne je to čisté a interaktívne.
+ * Vrstvy pinov:
+ *   1. POI z tenant configu — obecný úrad, zdrav. stredisko, lekáreň, pošta,
+ *      fara, vet, kostol, šport, kultúra, ZŠ, MŠ, cintorín, defibrilátor
+ *   2. Senzory a osvetlenie z DB (obecne_zariadenia)
+ *   3. Aktívne hlásenia porúch (hlaseniaporuchy), ak má hlásenie GPS
  *
- * Pre produkciu odporúčam neskôr `react-native-maps` s real GPS pinmi,
- * keď budú zariadenia mať lat/lng v DB.
+ * Filter chips:
+ *   - Všetko, Služby, Šport/Kultúra, Školstvo, Infraštruktúra (osvetlenie, vet senzory), Hlásenia
+ *
+ * Klik na pin → otvorí inline detail panel s tlačidlami:
+ *   - "Zavolať" (ak má telefón)
+ *   - "Otvoriť službu" (ak je naviazaná na /sluzba/[id])
  */
 
+import { Badge, Card } from '@/components/ui'
+import LeafletMap, { LeafletMarker } from '@/components/LeafletMap'
 import { C } from '@/constants/colors'
+import { POIKategoria, PointZaujmu, useTenant } from '@/src/config/tenant'
 import { useObecneZariadenia, Zariadenie } from '@/src/hooks/useObecneZariadenia'
 import { supabase } from '@/src/lib/supabase'
+import { useThemeColors } from '@/src/theme/ThemeContext'
+import { radius, shadows, spacing, typo } from '@/src/theme/tokens'
 import { useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
+  Linking,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -30,17 +40,22 @@ import {
 
 const MAPA_MODRA = '#0D47A1'
 
-// Schematické pozície pinov (% v ploche mapy)
-// Hash z `id` zariadenia → deterministická pozícia.
-function hashPos(id: string): { x: number; y: number } {
-  let h = 0
-  for (let i = 0; i < id.length; i++) {
-    h = (h << 5) - h + id.charCodeAt(i)
-    h |= 0
-  }
-  const x = Math.abs(h) % 80 + 10        // 10–90 %
-  const y = Math.abs(h * 31) % 70 + 15   // 15–85 %
-  return { x, y }
+// ─── Konfigurácia POI farieb a ikon ───────────────────────────────────────
+const POI_STYLE: Record<POIKategoria, { color: string; emoji: string; label: string }> = {
+  urad:          { color: '#C62828', emoji: '🏛️', label: 'Úrad' },
+  zdravotnictvo: { color: '#1565C0', emoji: '🏥', label: 'Zdravotníctvo' },
+  lekaren:       { color: '#2E7D32', emoji: '💊', label: 'Lekáreň' },
+  posta:         { color: '#F9A825', emoji: '📮', label: 'Pošta' },
+  veterina:      { color: '#6A1B9A', emoji: '🐾', label: 'Veterina' },
+  kostol:        { color: '#5D4037', emoji: '⛪', label: 'Kostol' },
+  cintorin:      { color: '#37474F', emoji: '🕯️', label: 'Cintorín' },
+  sport:         { color: '#1B5E20', emoji: '⚽', label: 'Šport' },
+  kultura:       { color: '#AD1457', emoji: '🎭', label: 'Kultúra' },
+  skolstvo:      { color: '#00838F', emoji: '🎒', label: 'Školstvo' },
+  obchod:        { color: '#E65100', emoji: '🛒', label: 'Obchod' },
+  defibrilator:  { color: '#D32F2F', emoji: '🆘', label: 'AED' },
+  dolezite:      { color: '#455A64', emoji: '📍', label: 'Dôležité' },
+  iny:           { color: '#757575', emoji: '📌', label: 'Iné' },
 }
 
 type Hlasenie = {
@@ -49,416 +64,499 @@ type Hlasenie = {
   popis: string
   adresa: string | null
   status: string
+  lat: number | null
+  lng: number | null
 }
 
-type Filter = 'all' | 'osvetlenie' | 'senzory' | 'hlasenia'
+type Filter = 'vsetko' | 'sluzby' | 'sport_kultura' | 'skolstvo' | 'infrastruktura' | 'hlasenia'
 
+const FILTRE: { id: Filter; label: string }[] = [
+  { id: 'vsetko',         label: '🗂️ Všetko' },
+  { id: 'sluzby',         label: '🏥 Služby' },
+  { id: 'sport_kultura',  label: '⚽ Šport / kultúra' },
+  { id: 'skolstvo',       label: '🎒 Školstvo' },
+  { id: 'infrastruktura', label: '💡 Infraštruktúra' },
+  { id: 'hlasenia',       label: '⚠️ Hlásenia' },
+]
+
+const SLUZBY_KAT: POIKategoria[] = ['urad', 'zdravotnictvo', 'lekaren', 'posta', 'veterina', 'kostol', 'defibrilator']
+const SPORT_KULTURA_KAT: POIKategoria[] = ['sport', 'kultura']
+const SKOLSTVO_KAT: POIKategoria[] = ['skolstvo']
+
+// ─── Komponent ────────────────────────────────────────────────────────────
 export default function MapaScreen() {
   const router = useRouter()
-  const { zariadenia, loading: loadZ, error: errZ } = useObecneZariadenia()
+  const t = useThemeColors()
+  const tenant = useTenant()
+  const { zariadenia, loading: loadZ } = useObecneZariadenia()
   const [hlasenia, setHlasenia] = useState<Hlasenie[]>([])
   const [loadH, setLoadH] = useState(true)
-  const [filter, setFilter] = useState<Filter>('all')
-  const [vybrane, setVybrane] = useState<{
-    kind: 'zariadenie' | 'hlasenie'
-    data: Zariadenie | Hlasenie
-  } | null>(null)
+  const [filter, setFilter] = useState<Filter>('vsetko')
+  const [vybraneId, setVybraneId] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchHlasenia() {
+      // Skúsime načítať aj GPS súradnice; ak stĺpce neexistujú, padne to defenzívne.
       const { data } = await supabase
         .from('hlaseniaporuchy')
-        .select('id, kategoria, popis, adresa, status')
+        .select('id, kategoria, popis, adresa, status, lat, lng')
         .neq('status', 'vyriesene')
         .neq('status', 'zamietnute')
-      if (data) setHlasenia(data as Hlasenie[])
+      if (data) {
+        setHlasenia(data as any)
+      } else {
+        // Spätná kompatibilita — bez lat/lng
+        const { data: fb } = await supabase
+          .from('hlaseniaporuchy')
+          .select('id, kategoria, popis, adresa, status')
+          .neq('status', 'vyriesene')
+          .neq('status', 'zamietnute')
+        setHlasenia(((fb as any) || []).map((h: any) => ({ ...h, lat: null, lng: null })))
+      }
       setLoadH(false)
     }
     fetchHlasenia()
   }, [])
 
-  const osvetlenia = zariadenia.filter(z => z.typ === 'osvetlenie')
-  const senzory = zariadenia.filter(z => z.typ !== 'osvetlenie')
+  // Vyrobíme markers pre LeafletMap z aktívneho filtra
+  const markers: LeafletMarker[] = useMemo(() => {
+    const out: LeafletMarker[] = []
 
-  const pinsToShow = (() => {
-    const arr: { id: string; pos: { x: number; y: number }; color: string; emoji: string; data: any; kind: 'zariadenie' | 'hlasenie' }[] = []
+    // 1. POI
+    const pointsToShow: PointZaujmu[] = (() => {
+      if (filter === 'vsetko') return tenant.pointyZaujmu
+      if (filter === 'sluzby') return tenant.pointyZaujmu.filter(p => SLUZBY_KAT.includes(p.kategoria))
+      if (filter === 'sport_kultura') return tenant.pointyZaujmu.filter(p => SPORT_KULTURA_KAT.includes(p.kategoria))
+      if (filter === 'skolstvo') return tenant.pointyZaujmu.filter(p => SKOLSTVO_KAT.includes(p.kategoria))
+      return []
+    })()
 
-    if (filter === 'all' || filter === 'osvetlenie') {
-      osvetlenia.forEach(o => arr.push({
-        id: o.id,
-        pos: hashPos(o.id),
-        color: o.stav ? C.brand.gold : '#9E9E9E',
-        emoji: '💡',
-        data: o,
-        kind: 'zariadenie',
-      }))
-    }
-    if (filter === 'all' || filter === 'senzory') {
-      senzory.forEach(s => {
-        const c = s.typ === 'senzor_vody' ? '#0288D1'
-          : s.typ === 'meteo' ? '#26A69A'
-          : '#5D4037' // kontajner
-        const e = s.typ === 'senzor_vody' ? '💧'
-          : s.typ === 'meteo' ? '🌡️'
+    pointsToShow.forEach(p => {
+      const st = POI_STYLE[p.kategoria]
+      out.push({
+        id: `poi:${p.id}`,
+        lat: p.lat, lng: p.lng,
+        color: st.color, emoji: st.emoji,
+        label: p.nazov,
+        active: p.kategoria === 'defibrilator',
+      })
+    })
+
+    // 2. Infraštruktúra (osvetlenie, vet senzory) — len ak ich máme s GPS
+    if (filter === 'vsetko' || filter === 'infrastruktura') {
+      zariadenia.forEach((z: any) => {
+        const lat = z.lat ?? null
+        const lng = z.lng ?? null
+        if (lat == null || lng == null) return
+        const isLamp = z.typ === 'osvetlenie'
+        const color = isLamp ? (z.stav ? '#F9A825' : '#9E9E9E')
+          : z.typ === 'senzor_vody' ? '#0288D1'
+          : z.typ === 'meteo' ? '#26A69A'
+          : '#5D4037'
+        const emoji = isLamp ? '💡'
+          : z.typ === 'senzor_vody' ? '💧'
+          : z.typ === 'meteo' ? '🌡️'
           : '🗑️'
-        arr.push({
-          id: s.id, pos: hashPos(s.id), color: c, emoji: e, data: s, kind: 'zariadenie',
+        out.push({
+          id: `dev:${z.id}`,
+          lat, lng, color, emoji,
+          label: z.nazov || z.typ,
         })
       })
     }
-    if (filter === 'all' || filter === 'hlasenia') {
-      hlasenia.forEach(h => arr.push({
-        id: h.id, pos: hashPos(h.id), color: C.brand.red, emoji: '⚠️',
-        data: h, kind: 'hlasenie',
-      }))
+
+    // 3. Hlásenia
+    if (filter === 'vsetko' || filter === 'hlasenia') {
+      hlasenia.forEach(h => {
+        if (h.lat == null || h.lng == null) return
+        out.push({
+          id: `hla:${h.id}`,
+          lat: h.lat, lng: h.lng,
+          color: C.brand.red, emoji: '⚠️',
+          label: `Hlásenie: ${h.kategoria}`,
+          active: h.status === 'nove',
+        })
+      })
     }
-    return arr
-  })()
+
+    return out
+  }, [filter, tenant.pointyZaujmu, zariadenia, hlasenia])
+
+  // Detail vybraného pinu
+  const vybrane = useMemo(() => {
+    if (!vybraneId) return null
+    if (vybraneId.startsWith('poi:')) {
+      const id = vybraneId.slice(4)
+      const poi = tenant.pointyZaujmu.find(p => p.id === id)
+      return poi ? { kind: 'poi' as const, data: poi } : null
+    }
+    if (vybraneId.startsWith('dev:')) {
+      const id = vybraneId.slice(4)
+      const dev = zariadenia.find(z => z.id === id)
+      return dev ? { kind: 'dev' as const, data: dev } : null
+    }
+    if (vybraneId.startsWith('hla:')) {
+      const id = vybraneId.slice(4)
+      const h = hlasenia.find(x => x.id === id)
+      return h ? { kind: 'hla' as const, data: h } : null
+    }
+    return null
+  }, [vybraneId, tenant.pointyZaujmu, zariadenia, hlasenia])
 
   const loading = loadZ || loadH
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: t.background }]}>
       <StatusBar barStyle="light-content" backgroundColor={MAPA_MODRA} />
 
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.back}>
+      <View style={[styles.header, { backgroundColor: MAPA_MODRA }]}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.back} hitSlop={10}>
           <Text style={styles.backText}>← Späť</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>🗺️ Mapa obce</Text>
-        <Text style={styles.headerSub}>Schematický prehľad infraštruktúry</Text>
+        <Text style={styles.headerSub}>{tenant.nazov} · OpenStreetMap</Text>
       </View>
 
       {/* Filter chips */}
-      <View style={styles.chipsRow}>
-        <FilterChip label="Všetko" active={filter === 'all'} onPress={() => setFilter('all')} />
-        <FilterChip label="💡 Osvetlenie" active={filter === 'osvetlenie'} onPress={() => setFilter('osvetlenie')} />
-        <FilterChip label="📡 Senzory" active={filter === 'senzory'} onPress={() => setFilter('senzory')} />
-        <FilterChip label="⚠️ Hlásenia" active={filter === 'hlasenia'} onPress={() => setFilter('hlasenia')} />
+      <View style={[styles.chipsWrap, { backgroundColor: t.surface, borderBottomColor: t.borderLight }]}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipsRow}
+        >
+          {FILTRE.map(f => (
+            <FilterChip
+              key={f.id}
+              label={f.label}
+              active={filter === f.id}
+              onPress={() => { setFilter(f.id); setVybraneId(null) }}
+            />
+          ))}
+        </ScrollView>
       </View>
 
-      {loading && (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={MAPA_MODRA} />
-        </View>
-      )}
-
-      {errZ && (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorMsg}>{errZ}</Text>
-          <Text style={styles.errorHint}>
-            Tip: vytvorte tabuľku obecne_zariadenia v Supabase.
+      <ScrollView contentContainerStyle={{ paddingBottom: spacing.xl }}>
+        {/* Reálna mapa */}
+        <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg }}>
+          <LeafletMap
+            center={tenant.mapaCentrum}
+            zoom={tenant.mapaCentrum.zoom}
+            markers={markers}
+            onMarkerPress={(id) => setVybraneId(id)}
+            fitBoundsToMarkers={false}
+            style={{ height: 380 }}
+          />
+          <Text style={[styles.caption, { color: t.textMuted }]}>
+            {markers.length} {markers.length === 1 ? 'bod' : markers.length < 5 ? 'body' : 'bodov'} na mape ·
+            Klepnutím na pin otvoríte detail
           </Text>
         </View>
-      )}
 
-      {!loading && (
-        <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
-          {/* Schematic mapa */}
-          <View style={styles.mapaWrap}>
-            <View style={styles.mapa}>
-              {/* Pozadie — štylizovaná obecná silueta */}
-              <View style={styles.river} />
-              <View style={styles.road1} />
-              <View style={styles.road2} />
-              <View style={styles.center_marker}>
-                <Text style={styles.centerLabel}>VÝČAPY-OPATOVCE</Text>
+        {/* Štatistika */}
+        <View style={styles.statsRow}>
+          <StatCard
+            label="Bodov záujmu"
+            value={tenant.pointyZaujmu.length}
+            color={MAPA_MODRA}
+            emoji="📍"
+          />
+          <StatCard
+            label="Zariadení s GPS"
+            value={zariadenia.filter((z: any) => z.lat != null && z.lng != null).length}
+            color="#0288D1"
+            emoji="📡"
+          />
+          <StatCard
+            label="Hlásení"
+            value={hlasenia.length}
+            color={C.brand.red}
+            emoji="⚠️"
+          />
+        </View>
+
+        {/* Detail vybraného pinu */}
+        {vybrane && (
+          <View style={{ paddingHorizontal: spacing.lg, marginTop: spacing.md }}>
+            <Card>
+              <View style={styles.detailHead}>
+                <Text style={[styles.detailTitul, { color: t.text }]}>
+                  {vybrane.kind === 'poi'
+                    ? vybrane.data.nazov
+                    : vybrane.kind === 'dev'
+                      ? (vybrane.data as any).nazov
+                      : `Hlásenie · ${(vybrane.data as Hlasenie).kategoria}`}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setVybraneId(null)}
+                  hitSlop={10}
+                  style={styles.detailClose}
+                >
+                  <Text style={[styles.detailCloseTxt, { color: t.textMuted }]}>✕</Text>
+                </TouchableOpacity>
               </View>
 
-              {/* Piny */}
-              {pinsToShow.map(p => (
-                <TouchableOpacity
-                  key={p.id}
-                  style={[
-                    styles.pin,
-                    {
-                      left: `${p.pos.x}%`,
-                      top: `${p.pos.y}%`,
-                      backgroundColor: p.color,
-                    },
-                  ]}
-                  activeOpacity={0.7}
-                  onPress={() => setVybrane({ kind: p.kind, data: p.data })}
-                >
-                  <Text style={styles.pinEmoji}>{p.emoji}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+              {vybrane.kind === 'poi' && (
+                <PoiDetail poi={vybrane.data} router={router} t={t} />
+              )}
+              {vybrane.kind === 'dev' && (
+                <DevDetail dev={vybrane.data} t={t} />
+              )}
+              {vybrane.kind === 'hla' && (
+                <HlasenieDetail h={vybrane.data} t={t} />
+              )}
+            </Card>
+          </View>
+        )}
 
-            <Text style={styles.mapaCaption}>
-              Schematické zobrazenie. Klikni na pin pre detail.
+        {loading && (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="small" color={MAPA_MODRA} />
+            <Text style={[styles.loadingText, { color: t.textMuted }]}>
+              Načítavam ďalšie dáta…
             </Text>
           </View>
-
-          {/* Štatistika */}
-          <View style={styles.statsRow}>
-            <StatCard
-              label="Osvetlenie"
-              total={osvetlenia.length}
-              active={osvetlenia.filter(o => o.stav).length}
-              color={C.brand.gold}
-              emoji="💡"
-            />
-            <StatCard
-              label="Senzory"
-              total={senzory.length}
-              active={senzory.length}
-              color="#0288D1"
-              emoji="📡"
-            />
-            <StatCard
-              label="Aktívne hlásenia"
-              total={hlasenia.length}
-              active={hlasenia.length}
-              color={C.brand.red}
-              emoji="⚠️"
-            />
-          </View>
-
-          {/* Detail vybraného pinu */}
-          {vybrane && (
-            <View style={styles.detail}>
-              <View style={styles.detailHead}>
-                <Text style={styles.detailTitul}>
-                  {vybrane.kind === 'zariadenie'
-                    ? (vybrane.data as Zariadenie).nazov
-                    : `Hlásenie: ${(vybrane.data as Hlasenie).kategoria}`}
-                </Text>
-                <TouchableOpacity onPress={() => setVybrane(null)} style={styles.detailClose}>
-                  <Text style={{ fontSize: 18, color: C.textMuted }}>✕</Text>
-                </TouchableOpacity>
-              </View>
-              {vybrane.kind === 'zariadenie' ? (
-                <ZariadenieDetail z={vybrane.data as Zariadenie} />
-              ) : (
-                <HlasenieDetail h={vybrane.data as Hlasenie} />
-              )}
-            </View>
-          )}
-        </ScrollView>
-      )}
+        )}
+      </ScrollView>
     </SafeAreaView>
   )
 }
 
+// ─── Filter Chip ─────────────────────────────────────────────────────────
 function FilterChip({ label, active, onPress }: {
   label: string; active: boolean; onPress: () => void
 }) {
+  const t = useThemeColors()
   return (
     <TouchableOpacity
-      style={[styles.chip, active && styles.chipActive]}
+      style={[
+        styles.chip,
+        { backgroundColor: t.surface, borderColor: t.border },
+        active && { backgroundColor: MAPA_MODRA, borderColor: MAPA_MODRA },
+      ]}
       onPress={onPress}
-      activeOpacity={0.7}
+      activeOpacity={0.75}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
     >
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+      <Text style={[
+        styles.chipText,
+        { color: t.textSecondary },
+        active && { color: '#FFFFFF', fontWeight: '900' },
+      ]}>
+        {label}
+      </Text>
     </TouchableOpacity>
   )
 }
 
-function StatCard({ label, total, active, color, emoji }: {
-  label: string; total: number; active: number; color: string; emoji: string
+// ─── Stat Card ───────────────────────────────────────────────────────────
+function StatCard({ label, value, color, emoji }: {
+  label: string; value: number; color: string; emoji: string
 }) {
+  const t = useThemeColors()
   return (
-    <View style={styles.statCard}>
+    <View style={[styles.statCard, { backgroundColor: t.surface, shadowColor: t.shadow }]}>
       <Text style={styles.statEmoji}>{emoji}</Text>
-      <Text style={[styles.statNum, { color }]}>{active}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-      {label === 'Osvetlenie' && (
-        <Text style={styles.statSub}>z {total}</Text>
-      )}
+      <Text style={[styles.statNum, { color }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color: t.textSecondary }]}>{label}</Text>
     </View>
   )
 }
 
-function ZariadenieDetail({ z }: { z: Zariadenie }) {
+// ─── POI Detail ──────────────────────────────────────────────────────────
+function PoiDetail({ poi, router, t }: { poi: PointZaujmu; router: any; t: any }) {
+  const st = POI_STYLE[poi.kategoria]
+  return (
+    <View style={{ gap: spacing.sm }}>
+      <View style={styles.detailMetaRow}>
+        <Badge label={st.label} tone="info" style={{ backgroundColor: st.color + '22' }} textStyle={{ color: st.color }} />
+        <View style={[styles.coordPill, { backgroundColor: t.surfaceAlt }]}>
+          <Text style={[styles.coordText, { color: t.textMuted }]}>
+            {poi.lat.toFixed(4)}, {poi.lng.toFixed(4)}
+          </Text>
+        </View>
+      </View>
+      {poi.podtitul && (
+        <Text style={[styles.detailText, { color: t.textSecondary }]}>{poi.podtitul}</Text>
+      )}
+      <View style={styles.actionRow}>
+        {poi.telefon && (
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: C.brand.green }]}
+            onPress={() => {
+              Alert.alert(
+                'Zavolať?',
+                poi.nazov,
+                [
+                  { text: 'Zrušiť', style: 'cancel' },
+                  { text: 'Zavolať', onPress: () => Linking.openURL(`tel:${poi.telefon}`) },
+                ],
+              )
+            }}
+          >
+            <Text style={styles.actionBtnText}>📞 Zavolať</Text>
+          </TouchableOpacity>
+        )}
+        {poi.sluzbaId && (
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: MAPA_MODRA }]}
+            onPress={() => router.push(`/sluzba/${poi.sluzbaId}` as never)}
+          >
+            <Text style={styles.actionBtnText}>📋 Otvoriť detail</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={[styles.actionBtn, { backgroundColor: t.surfaceAlt, borderWidth: 1, borderColor: t.border }]}
+          onPress={() => {
+            // Otvor v default mapách (mapy.cz / Google Maps universal link)
+            const url = `https://www.google.com/maps/search/?api=1&query=${poi.lat},${poi.lng}`
+            Linking.openURL(url)
+          }}
+        >
+          <Text style={[styles.actionBtnText, { color: t.text }]}>🧭 Navigovať</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  )
+}
+
+// ─── Dev (zariadenie) Detail ─────────────────────────────────────────────
+function DevDetail({ dev, t }: { dev: Zariadenie | any; t: any }) {
   return (
     <View style={{ gap: 6 }}>
-      {z.ulica && <Text style={styles.detailRow}>📍 {z.ulica}</Text>}
-      <Text style={styles.detailRow}>Typ: {z.typ}</Text>
-      {z.stav != null && (
-        <Text style={styles.detailRow}>
-          Stav: {z.stav
+      {dev.ulica && (
+        <Text style={[styles.detailText, { color: t.textSecondary }]}>📍 {dev.ulica}</Text>
+      )}
+      <Text style={[styles.detailText, { color: t.textSecondary }]}>Typ: {dev.typ}</Text>
+      {dev.stav != null && (
+        <Text style={[styles.detailText, { color: t.textSecondary }]}>
+          Stav: {dev.stav
             ? <Text style={{ color: C.secondary, fontWeight: '800' }}>ZAPNUTÉ</Text>
-            : <Text style={{ color: C.textMuted, fontWeight: '800' }}>VYPNUTÉ</Text>}
+            : <Text style={{ color: t.textMuted, fontWeight: '800' }}>VYPNUTÉ</Text>}
         </Text>
       )}
-      {z.posledna_hodnota != null && (
-        <Text style={styles.detailRow}>
-          Hodnota: <Text style={{ fontWeight: '800' }}>{z.posledna_hodnota}{z.jednotka ?? ''}</Text>
+      {dev.posledna_hodnota != null && (
+        <Text style={[styles.detailText, { color: t.textSecondary }]}>
+          Hodnota: <Text style={{ fontWeight: '800' }}>{dev.posledna_hodnota}{dev.jednotka ?? ''}</Text>
         </Text>
       )}
     </View>
   )
 }
 
-function HlasenieDetail({ h }: { h: Hlasenie }) {
+// ─── Hlásenie Detail ─────────────────────────────────────────────────────
+function HlasenieDetail({ h, t }: { h: Hlasenie; t: any }) {
   return (
     <View style={{ gap: 6 }}>
-      <Text style={styles.detailRow}>Kategória: <Text style={{ fontWeight: '800' }}>{h.kategoria}</Text></Text>
-      <Text style={styles.detailRow}>Stav: <Text style={{ fontWeight: '800', color: C.brand.red }}>{h.status}</Text></Text>
-      {h.adresa && <Text style={styles.detailRow}>📍 {h.adresa}</Text>}
-      <Text style={[styles.detailRow, { marginTop: 4, color: C.textSecondary }]}>
+      <Text style={[styles.detailText, { color: t.textSecondary }]}>
+        Kategória: <Text style={{ fontWeight: '800' }}>{h.kategoria}</Text>
+      </Text>
+      <Text style={[styles.detailText, { color: t.textSecondary }]}>
+        Stav: <Text style={{ fontWeight: '800', color: C.brand.red }}>{h.status}</Text>
+      </Text>
+      {h.adresa && (
+        <Text style={[styles.detailText, { color: t.textSecondary }]}>📍 {h.adresa}</Text>
+      )}
+      <Text style={[styles.detailText, { color: t.textSecondary, marginTop: 4 }]} numberOfLines={5}>
         {h.popis}
       </Text>
     </View>
   )
 }
 
+// ─── Štýly ────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.background },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  safe: { flex: 1 },
 
   header: {
-    backgroundColor: MAPA_MODRA,
-    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 18,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.lg,
     gap: 4,
   },
   back: { alignSelf: 'flex-start' },
-  backText: { color: '#fff', fontSize: 15, fontWeight: '700', marginBottom: 6 },
-  headerTitle: { color: '#fff', fontSize: 22, fontWeight: '800', letterSpacing: -0.3 },
-  headerSub: { color: 'rgba(255,255,255,0.85)', fontSize: 13 },
+  backText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700', marginBottom: 6 },
+  headerTitle: { color: '#FFFFFF', ...typo.h1 },
+  headerSub: { color: 'rgba(255,255,255,0.85)', ...typo.caption, fontWeight: '600' },
 
-  chipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    paddingHorizontal: 12, paddingVertical: 10,
-    backgroundColor: C.surface,
-    borderBottomWidth: 1, borderBottomColor: C.borderLight,
-  },
+  chipsWrap: { borderBottomWidth: 1 },
+  chipsRow: { padding: spacing.md, gap: spacing.sm },
   chip: {
-    paddingHorizontal: 12, paddingVertical: 6,
-    backgroundColor: C.surface,
-    borderRadius: 16,
-    borderWidth: 1.5, borderColor: C.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
   },
-  chipActive: { backgroundColor: MAPA_MODRA, borderColor: MAPA_MODRA },
-  chipText: { fontSize: 12, fontWeight: '700', color: C.textSecondary },
-  chipTextActive: { color: '#fff' },
+  chipText: { ...typo.caption, fontWeight: '700' },
 
-  errorBox: { margin: 16, padding: 14, backgroundColor: C.surface, borderRadius: 12, borderLeftWidth: 4, borderLeftColor: C.brand.red, gap: 4 },
-  errorMsg: { fontSize: 13, color: C.textSecondary },
-  errorHint: { fontSize: 12, color: C.textMuted, lineHeight: 18 },
-
-  // Mapa
-  mapaWrap: { padding: 16 },
-  mapa: {
-    height: 360,
-    backgroundColor: '#E8F5E9',
-    borderRadius: 16,
-    overflow: 'hidden',
-    position: 'relative',
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-  // Štylizovaný "potok"
-  river: {
-    position: 'absolute',
-    top: '40%',
-    left: 0, right: 0,
-    height: 10,
-    backgroundColor: '#90CAF9',
-    transform: [{ rotate: '-3deg' }],
-  },
-  // Cesty
-  road1: {
-    position: 'absolute',
-    top: '20%', bottom: '20%',
-    left: '30%',
-    width: 4,
-    backgroundColor: 'rgba(0,0,0,0.18)',
-    transform: [{ rotate: '5deg' }],
-  },
-  road2: {
-    position: 'absolute',
-    left: 0, right: 0,
-    top: '65%',
-    height: 4,
-    backgroundColor: 'rgba(0,0,0,0.18)',
-  },
-  center_marker: {
-    position: 'absolute',
-    top: '50%', left: '50%',
-    transform: [{ translateX: -80 }, { translateY: -10 }],
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    paddingHorizontal: 12, paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1, borderColor: C.border,
-  },
-  centerLabel: {
-    fontSize: 11, fontWeight: '900',
-    color: C.text, letterSpacing: 0.5,
-  },
-
-  pin: {
-    position: 'absolute',
-    width: 32, height: 32, borderRadius: 16,
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 3, borderColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-    transform: [{ translateX: -16 }, { translateY: -16 }],
-  },
-  pinEmoji: { fontSize: 16 },
-
-  mapaCaption: {
-    fontSize: 11, color: C.textMuted,
-    textAlign: 'center', marginTop: 10,
+  caption: {
+    ...typo.micro,
+    textAlign: 'center',
+    marginTop: spacing.sm,
   },
 
   // Štatistiky
   statsRow: {
     flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 16,
-    marginBottom: 16,
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    marginTop: spacing.lg,
   },
   statCard: {
     flex: 1,
-    backgroundColor: C.surface,
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: radius.md,
+    padding: spacing.md,
     alignItems: 'center',
-    shadowColor: C.shadow,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    ...shadows.sm,
   },
   statEmoji: { fontSize: 22 },
   statNum: { fontSize: 22, fontWeight: '900', marginTop: 2 },
-  statLabel: { fontSize: 11, color: C.textSecondary, marginTop: 2, fontWeight: '700', textAlign: 'center' },
-  statSub: { fontSize: 10, color: C.textPlaceholder, marginTop: 1 },
+  statLabel: { fontSize: 11, marginTop: 2, fontWeight: '700', textAlign: 'center' },
 
-  // Detail pinu
-  detail: {
-    backgroundColor: C.surface,
-    margin: 16,
-    marginTop: 0,
-    borderRadius: 14,
-    padding: 14,
-    shadowColor: C.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
-    gap: 6,
-  },
+  // Detail
   detailHead: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 4,
+    marginBottom: spacing.sm,
   },
-  detailTitul: {
-    flex: 1,
-    fontSize: 15, fontWeight: '800', color: C.text,
-    paddingRight: 8,
-  },
+  detailTitul: { ...typo.h3, flex: 1, paddingRight: 8 },
   detailClose: { padding: 4 },
-  detailRow: { fontSize: 13, color: C.text },
+  detailCloseTxt: { fontSize: 20 },
+  detailMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flexWrap: 'wrap',
+  },
+  coordPill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
+  },
+  coordText: { fontSize: 11, fontWeight: '600', fontFamily: 'monospace' },
+  detailText: { ...typo.body },
+
+  actionRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    flexWrap: 'wrap',
+    marginTop: spacing.sm,
+  },
+  actionBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    borderRadius: radius.sm,
+  },
+  actionBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+
+  loadingBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: spacing.md,
+  },
+  loadingText: { fontSize: 12, fontWeight: '600' },
 })

@@ -1,74 +1,151 @@
 /**
- * useSeniorMode — prepínač senior módu.
+ * useSeniorMode — prepínač senior módu + nastavenia (font scale, vlastné kontakty).
  *
- * Aktuálna verzia drží stav iba v pamäti (resetuje sa pri reštarte appky).
- *
- * ─── PERZISTENCIA (voliteľné, neskôr) ──────────────────────────────────────
- * Ak chceš aby si appka pamätala senior mód medzi spusteniami, nainštaluj:
- *
+ * Aktuálna verzia drží stav v pamäti modulu — pri reštarte appky sa resetuje.
+ * Pre perzistenciu medzi spusteniami:
  *   npx expo install @react-native-async-storage/async-storage
+ * → odkomentuj loadFromStorage / saveToStorage funkcie nižšie.
  *
- * Potom odkomentuj nasledovný riadok aj `loadFromStorage`/`saveToStorage`
- * implementácie nižšie.
- * ────────────────────────────────────────────────────────────────────────── */
+ * API:
+ *   const { isSenior, set, toggle } = useSeniorMode()
+ *   const { fontScale, setFontScale } = useSeniorMode()
+ *   const { customKontakty, addKontakt, removeKontakt } = useSeniorMode()
+ *
+ *   const fonts = useSeniorFontSizes()  // → reaktívne podľa fontScale
+ */
 
 // import AsyncStorage from '@react-native-async-storage/async-storage'
-import { useCallback, useEffect, useState } from 'react'
+import { CustomKontakt, FontScale, FONT_SCALES } from '@/constants/seniorMode'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
-const STORAGE_KEY = 'seniorMode'
+const KEY_ENABLED = 'seniorMode'
+const KEY_SCALE   = 'seniorFontScale'
+const KEY_KONTAKTY= 'seniorCustomKontakty'
 
-// ── Modul-level shared state, aby useSeniorMode v rôznych komponentoch
-//    videl tú istú hodnotu kým appka beží.
-let memoryValue = false
-const subscribers = new Set<(v: boolean) => void>()
-
-function setShared(v: boolean) {
-  memoryValue = v
-  subscribers.forEach(fn => fn(v))
+// ─── Module-level shared state ────────────────────────────────────────────
+type State = {
+  enabled: boolean
+  fontScale: FontScale
+  customKontakty: CustomKontakt[]
 }
 
-async function loadFromStorage(): Promise<boolean> {
-  // Po nainštalovaní AsyncStorage odkomentuj:
+let mem: State = {
+  enabled: false,
+  fontScale: 'medium',
+  customKontakty: [],
+}
+
+const subscribers = new Set<(s: State) => void>()
+
+function setShared(next: Partial<State>) {
+  mem = { ...mem, ...next }
+  subscribers.forEach(fn => fn(mem))
+}
+
+async function loadFromStorage(): Promise<State> {
+  // Po nainštalovaní AsyncStorage:
   // try {
-  //   const v = await AsyncStorage.getItem(STORAGE_KEY)
-  //   return v === 'true'
-  // } catch { return false }
-  void STORAGE_KEY
-  return memoryValue
+  //   const [en, sc, k] = await Promise.all([
+  //     AsyncStorage.getItem(KEY_ENABLED),
+  //     AsyncStorage.getItem(KEY_SCALE),
+  //     AsyncStorage.getItem(KEY_KONTAKTY),
+  //   ])
+  //   return {
+  //     enabled: en === 'true',
+  //     fontScale: (sc as FontScale) || 'medium',
+  //     customKontakty: k ? JSON.parse(k) : [],
+  //   }
+  // } catch { return mem }
+  void [KEY_ENABLED, KEY_SCALE, KEY_KONTAKTY]
+  return mem
 }
 
-async function saveToStorage(v: boolean) {
-  // Po nainštalovaní AsyncStorage odkomentuj:
-  // try { await AsyncStorage.setItem(STORAGE_KEY, v.toString()) } catch {}
+async function saveEnabled(v: boolean) {
+  // try { await AsyncStorage.setItem(KEY_ENABLED, String(v)) } catch {}
   void v
 }
+async function saveScale(s: FontScale) {
+  // try { await AsyncStorage.setItem(KEY_SCALE, s) } catch {}
+  void s
+}
+async function saveKontakty(k: CustomKontakt[]) {
+  // try { await AsyncStorage.setItem(KEY_KONTAKTY, JSON.stringify(k)) } catch {}
+  void k
+}
+
+// ─── Hook ─────────────────────────────────────────────────────────────────
 
 export function useSeniorMode() {
-  const [isSenior, setIsSenior] = useState(memoryValue)
+  const [state, setState] = useState<State>(mem)
   const [hydrated, setHydrated] = useState(false)
 
-  // Hydrate raz pri prvom renderi
   useEffect(() => {
     let alive = true
-    loadFromStorage().then(v => {
+    loadFromStorage().then(s => {
       if (alive) {
-        memoryValue = v
-        setIsSenior(v)
+        mem = s
+        setState(s)
         setHydrated(true)
       }
     })
-    // Subscribe na zmeny zdieľaného stavu
-    const sub = (next: boolean) => setIsSenior(next)
+    const sub = (next: State) => setState(next)
     subscribers.add(sub)
     return () => { alive = false; subscribers.delete(sub) }
   }, [])
 
+  // Toggle / set enabled
   const set = useCallback(async (value: boolean) => {
-    setShared(value)
-    await saveToStorage(value)
+    setShared({ enabled: value })
+    await saveEnabled(value)
+  }, [])
+  const toggle = useCallback(() => set(!mem.enabled), [set])
+
+  // Font scale
+  const setFontScale = useCallback(async (scale: FontScale) => {
+    setShared({ fontScale: scale })
+    await saveScale(scale)
   }, [])
 
-  const toggle = useCallback(() => set(!memoryValue), [set])
+  // Custom kontakty
+  const addKontakt = useCallback(async (k: Omit<CustomKontakt, 'id'>) => {
+    const next: CustomKontakt = { ...k, id: Date.now().toString(36) }
+    const list = [...mem.customKontakty, next]
+    setShared({ customKontakty: list })
+    await saveKontakty(list)
+    return next
+  }, [])
 
-  return { isSenior, hydrated, set, toggle }
+  const removeKontakt = useCallback(async (id: string) => {
+    const list = mem.customKontakty.filter(k => k.id !== id)
+    setShared({ customKontakty: list })
+    await saveKontakty(list)
+  }, [])
+
+  const updateKontakt = useCallback(async (id: string, patch: Partial<CustomKontakt>) => {
+    const list = mem.customKontakty.map(k => (k.id === id ? { ...k, ...patch } : k))
+    setShared({ customKontakty: list })
+    await saveKontakty(list)
+  }, [])
+
+  return {
+    isSenior: state.enabled,
+    hydrated,
+    set,
+    toggle,
+    fontScale: state.fontScale,
+    setFontScale,
+    customKontakty: state.customKontakty,
+    addKontakt,
+    removeKontakt,
+    updateKontakt,
+  }
+}
+
+/**
+ * Vráti aktuálnu sadu veľkostí písma podľa fontScale nastavenia.
+ * Komponenty by mali volať tento hook namiesto priameho SENIOR.fontSize.
+ */
+export function useSeniorFontSizes() {
+  const { fontScale } = useSeniorMode()
+  return useMemo(() => FONT_SCALES[fontScale], [fontScale])
 }
