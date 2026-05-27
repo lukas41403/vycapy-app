@@ -338,6 +338,8 @@ export default function AdminScreen() {
   )
 }
 
+type PublishMode = 'koncept' | 'ihned' | 'naplanovat'
+
 function NovAktualitaForm() {
   const [podtab, setPodtab] = useState<'nova' | 'zoznam'>('nova')
   const [aktuality, setAktuality] = useState<AktualitaItem[]>([])
@@ -347,7 +349,9 @@ function NovAktualitaForm() {
   const [body, setBody] = useState('')
   const [kategoria, setKategoria] = useState('oznam')
   const [loading, setLoading] = useState(false)
-  const [publikovat, setPublikovat] = useState(true)
+  const [publishMode, setPublishMode] = useState<PublishMode>('ihned')
+  const [scheduledDate, setScheduledDate] = useState('')   // RRRR-MM-DD
+  const [scheduledTime, setScheduledTime] = useState('')   // HH:MM
   const [coverUri, setCoverUri] = useState<string | null>(null)
 
   async function vybratCover() {
@@ -395,6 +399,16 @@ function NovAktualitaForm() {
     ])
   }
 
+  /** Vráti ISO timestamp pre naplánované publikovanie, alebo null pri chybe. */
+  function parseScheduledIso(): string | null {
+    if (!scheduledDate) return null
+    const cas = scheduledTime || '08:00'
+    const iso = `${scheduledDate}T${cas}:00`
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return null
+    return d.toISOString()
+  }
+
   async function publikovatAktualitu() {
     if (title.trim().length < 3) {
       Alert.alert('Chýba titulok', 'Titulok musí mať aspoň 3 znaky.')
@@ -404,6 +418,24 @@ function NovAktualitaForm() {
       Alert.alert('Chýba text', 'Text aktuality musí mať aspoň 10 znakov.')
       return
     }
+
+    // Validácia naplánovania
+    let scheduledIso: string | null = null
+    if (publishMode === 'naplanovat') {
+      scheduledIso = parseScheduledIso()
+      if (!scheduledIso) {
+        Alert.alert('Neplatný čas', 'Zadajte platný dátum (RRRR-MM-DD) a čas (HH:MM) pre naplánovanie.')
+        return
+      }
+      if (new Date(scheduledIso).getTime() < Date.now() - 60000) {
+        Alert.alert(
+          'Čas v minulosti',
+          'Naplánovaný čas musí byť v budúcnosti. Pre okamžité publikovanie použite "Publikovať ihneď".',
+        )
+        return
+      }
+    }
+
     setLoading(true)
 
     // Upload cover ak je vybraný
@@ -427,21 +459,35 @@ function NovAktualitaForm() {
       }
     }
 
-    const { error } = await supabase.from('aktuality').insert({
+    // Mapping publish mode → DB stĺpce
+    //   koncept     → is_published=false, published_at=null
+    //   ihned       → is_published=true,  published_at=now()
+    //   naplanovat  → is_published=true,  published_at=scheduledIso (v budúcnosti)
+    const dbRecord = {
       title: title.trim(),
       perex: perex.trim() || null,
       body: body.trim(),
       kategoria,
       cover_url: coverUrl,
-      is_published: publikovat,
-      published_at: publikovat ? new Date().toISOString() : null,
-    })
+      is_published: publishMode !== 'koncept',
+      published_at:
+        publishMode === 'ihned'      ? new Date().toISOString()
+      : publishMode === 'naplanovat' ? scheduledIso
+      : null,
+    }
+
+    const { error } = await supabase.from('aktuality').insert(dbRecord)
     setLoading(false)
     if (error) {
       Alert.alert('Chyba', 'Aktualitu sa nepodarilo uložiť.\n\n' + error.message)
     } else {
-      Alert.alert('Hotovo!', publikovat ? 'Aktualita bola publikovaná.' : 'Uložená ako koncept.')
+      const sprava =
+        publishMode === 'ihned'      ? 'Aktualita bola publikovaná.'
+      : publishMode === 'naplanovat' ? `Naplánované na ${new Date(scheduledIso!).toLocaleString('sk-SK', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}.`
+      :                                 'Uložené ako koncept.'
+      Alert.alert('Hotovo!', sprava)
       setTitle(''); setPerex(''); setBody(''); setKategoria('oznam'); setCoverUri(null)
+      setScheduledDate(''); setScheduledTime('')
     }
   }
 
@@ -521,21 +567,96 @@ function NovAktualitaForm() {
             <TextInput style={[styles.input, { height: 160 }]}
               placeholder="Celý text..." placeholderTextColor={C.textPlaceholder}
               value={body} onChangeText={setBody} multiline textAlignVertical="top" />
-            <View style={styles.publikovatRow}>
-              <Text style={styles.formLabel}>Publikovať ihneď</Text>
-              <TouchableOpacity
-                style={[styles.toggle, publikovat && styles.toggleActive]}
-                onPress={() => setPublikovat(!publikovat)}
-              >
-                <View style={[styles.toggleKnob, publikovat && styles.toggleKnobActive]} />
-              </TouchableOpacity>
+            {/* Publikovanie — 3 stavy */}
+            <Text style={styles.formLabel}>Publikovanie</Text>
+            <View style={publishStyles.modeRow}>
+              <PublishModeBtn
+                emoji="💾"
+                label="Koncept"
+                sub="Uložiť, nepublikovať"
+                active={publishMode === 'koncept'}
+                onPress={() => setPublishMode('koncept')}
+              />
+              <PublishModeBtn
+                emoji="🚀"
+                label="Ihneď"
+                sub="Publikovať teraz"
+                active={publishMode === 'ihned'}
+                onPress={() => setPublishMode('ihned')}
+              />
+              <PublishModeBtn
+                emoji="🕒"
+                label="Naplánovať"
+                sub="V určitý čas"
+                active={publishMode === 'naplanovat'}
+                onPress={() => setPublishMode('naplanovat')}
+              />
             </View>
+
+            {publishMode === 'naplanovat' && (
+              <View style={publishStyles.scheduleBox}>
+                <Text style={publishStyles.scheduleHint}>
+                  📅 Aktualita sa automaticky zobrazí občanom v zadaný čas.
+                </Text>
+                <View style={publishStyles.scheduleRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.formLabel, { marginBottom: 6 }]}>Dátum *</Text>
+                    <TextInput
+                      style={[styles.input, { marginBottom: 0 }]}
+                      placeholder="2026-06-15"
+                      placeholderTextColor={C.textPlaceholder}
+                      value={scheduledDate}
+                      onChangeText={setScheduledDate}
+                      keyboardType="numbers-and-punctuation"
+                    />
+                  </View>
+                  <View style={{ width: 110 }}>
+                    <Text style={[styles.formLabel, { marginBottom: 6 }]}>Čas</Text>
+                    <TextInput
+                      style={[styles.input, { marginBottom: 0 }]}
+                      placeholder="08:00"
+                      placeholderTextColor={C.textPlaceholder}
+                      value={scheduledTime}
+                      onChangeText={setScheduledTime}
+                      keyboardType="numbers-and-punctuation"
+                    />
+                  </View>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    <SchedulePreset label="Zajtra 8:00" onPress={() => {
+                      const d = new Date(); d.setDate(d.getDate() + 1)
+                      setScheduledDate(d.toISOString().slice(0, 10)); setScheduledTime('08:00')
+                    }} />
+                    <SchedulePreset label="Pondelok 7:00" onPress={() => {
+                      const d = new Date()
+                      const dow = d.getDay()           // 0 = nedeľa
+                      const dni = (1 + 7 - dow) % 7 || 7
+                      d.setDate(d.getDate() + dni)
+                      setScheduledDate(d.toISOString().slice(0, 10)); setScheduledTime('07:00')
+                    }} />
+                    <SchedulePreset label="O hodinu" onPress={() => {
+                      const d = new Date(Date.now() + 60 * 60 * 1000)
+                      setScheduledDate(d.toISOString().slice(0, 10))
+                      setScheduledTime(d.toTimeString().slice(0, 5))
+                    }} />
+                  </View>
+                </ScrollView>
+              </View>
+            )}
+
             <TouchableOpacity
-              style={[styles.submitBtn, loading && { opacity: 0.6 }]}
+              style={[styles.submitBtn, loading && { opacity: 0.6 }, { marginTop: 16 }]}
               onPress={publikovatAktualitu} disabled={loading}
             >
-              {loading ? <ActivityIndicator color={C.onPrimary} />
-                : <Text style={styles.submitBtnText}>{publikovat ? '🚀 Publikovať' : '💾 Uložiť koncept'}</Text>}
+              {loading
+                ? <ActivityIndicator color={C.onPrimary} />
+                : <Text style={styles.submitBtnText}>
+                    {publishMode === 'ihned'      ? '🚀 Publikovať teraz'
+                   : publishMode === 'naplanovat' ? '🕒 Naplánovať'
+                   :                                 '💾 Uložiť koncept'}
+                  </Text>
+              }
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -543,40 +664,141 @@ function NovAktualitaForm() {
         <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
           {nacitavam ? (
             <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }} />
-          ) : aktuality.map(a => (
-            <View key={a.id} style={styles.karta}>
-              <View style={styles.kartaHeader}>
-                <View style={styles.kartaInfo}>
-                  <Text style={styles.kartaKategoria}>
-                    {AKTUALITA_KATEGORIE_LABEL[a.kategoria]?.toUpperCase()}
-                  </Text>
-                  <Text style={styles.kartaPopis} numberOfLines={2}>{a.title}</Text>
+          ) : aktuality.map(a => {
+            // Určenie stavu: published / scheduled / koncept
+            const now = Date.now()
+            const pubTime = a.published_at ? new Date(a.published_at).getTime() : null
+            const stav: 'pub' | 'plan' | 'konc' =
+              !a.is_published || !pubTime ? 'konc'
+            : pubTime > now                ? 'plan'
+            :                                'pub'
+
+            const stavMeta = {
+              pub:  { bg: C.status.success.bg, fg: C.status.success.fg, label: '✓ Pub.' },
+              plan: { bg: C.status.warning.bg, fg: C.status.warning.fg, label: '🕒 Naplán.' },
+              konc: { bg: C.status.neutral.bg, fg: C.status.neutral.fg, label: '💾 Konc.' },
+            }[stav]
+
+            return (
+              <View key={a.id} style={styles.karta}>
+                <View style={styles.kartaHeader}>
+                  <View style={styles.kartaInfo}>
+                    <Text style={styles.kartaKategoria}>
+                      {AKTUALITA_KATEGORIE_LABEL[a.kategoria]?.toUpperCase()}
+                    </Text>
+                    <Text style={styles.kartaPopis} numberOfLines={2}>{a.title}</Text>
+                  </View>
+                  <View style={[styles.statusBadge, { backgroundColor: stavMeta.bg }]}>
+                    <Text style={[styles.statusText, { color: stavMeta.fg }]}>
+                      {stavMeta.label}
+                    </Text>
+                  </View>
                 </View>
-                <View style={[
-                  styles.statusBadge,
-                  { backgroundColor: a.is_published ? C.status.success.bg : C.status.warning.bg }
-                ]}>
-                  <Text style={[
-                    styles.statusText,
-                    { color: a.is_published ? C.status.success.fg : C.status.warning.fg }
-                  ]}>
-                    {a.is_published ? 'Pub.' : 'Koncept'}
-                  </Text>
+                <Text style={styles.kartaDatum}>
+                  {stav === 'pub' && a.published_at &&
+                    `Publikované: ${new Date(a.published_at).toLocaleDateString('sk-SK', {
+                      day: 'numeric', month: 'long', year: 'numeric',
+                    })}`
+                  }
+                  {stav === 'plan' && a.published_at &&
+                    `⏰ Bude publikované: ${new Date(a.published_at).toLocaleDateString('sk-SK', {
+                      weekday: 'long', day: 'numeric', month: 'long',
+                      hour: '2-digit', minute: '2-digit',
+                    })}`
+                  }
+                  {stav === 'konc' && 'Nepublikované (koncept)'}
+                </Text>
+
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                  {/* Quick action: naplánovanú aktualitu publikovať okamžite */}
+                  {stav === 'plan' && (
+                    <TouchableOpacity
+                      style={[styles.akciaBtn, { backgroundColor: C.status.success.bg }]}
+                      onPress={async () => {
+                        Alert.alert(
+                          'Publikovať teraz?',
+                          'Aktualita sa zobrazí občanom okamžite. Zrušíte tým naplánovanie.',
+                          [
+                            { text: 'Zrušiť', style: 'cancel' },
+                            {
+                              text: 'Publikovať',
+                              onPress: async () => {
+                                await supabase
+                                  .from('aktuality')
+                                  .update({ published_at: new Date().toISOString() })
+                                  .eq('id', a.id)
+                                nacitajAktuality()
+                              },
+                            },
+                          ],
+                        )
+                      }}
+                    >
+                      <Text style={[styles.akciaBtnText, { color: C.status.success.fg }]}>
+                        🚀 Publikovať teraz
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  {/* Quick action: koncept publikovať teraz */}
+                  {stav === 'konc' && (
+                    <TouchableOpacity
+                      style={[styles.akciaBtn, { backgroundColor: C.status.success.bg }]}
+                      onPress={async () => {
+                        await supabase
+                          .from('aktuality')
+                          .update({
+                            is_published: true,
+                            published_at: new Date().toISOString(),
+                          })
+                          .eq('id', a.id)
+                        nacitajAktuality()
+                      }}
+                    >
+                      <Text style={[styles.akciaBtnText, { color: C.status.success.fg }]}>
+                        🚀 Publikovať
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  {/* Skryť publikované */}
+                  {stav === 'pub' && (
+                    <TouchableOpacity
+                      style={[styles.akciaBtn, { backgroundColor: C.status.warning.bg }]}
+                      onPress={async () => {
+                        Alert.alert(
+                          'Skryť aktualitu?',
+                          'Aktualita prestane byť viditeľná občanom. Môžete ju neskôr znova publikovať.',
+                          [
+                            { text: 'Zrušiť', style: 'cancel' },
+                            {
+                              text: 'Skryť',
+                              onPress: async () => {
+                                await supabase
+                                  .from('aktuality')
+                                  .update({ is_published: false })
+                                  .eq('id', a.id)
+                                nacitajAktuality()
+                              },
+                            },
+                          ],
+                        )
+                      }}
+                    >
+                      <Text style={[styles.akciaBtnText, { color: C.status.warning.fg }]}>
+                        👁️‍🗨️ Skryť
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  <TouchableOpacity
+                    style={[styles.akciaBtn, { backgroundColor: C.status.danger.bg }]}
+                    onPress={() => zmazAktualitu(a.id)}
+                  >
+                    <Text style={[styles.akciaBtnText, { color: C.status.danger.fg }]}>🗑️ Zmazať</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
-              <Text style={styles.kartaDatum}>
-                {a.published_at
-                  ? new Date(a.published_at).toLocaleDateString('sk-SK', { day: 'numeric', month: 'long', year: 'numeric' })
-                  : 'Nepublikovaná'}
-              </Text>
-              <TouchableOpacity
-                style={[styles.akciaBtn, { backgroundColor: C.status.danger.bg, marginTop: 10, alignSelf: 'flex-start' }]}
-                onPress={() => zmazAktualitu(a.id)}
-              >
-                <Text style={[styles.akciaBtnText, { color: C.status.danger.fg }]}>🗑️ Zmazať</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
+            )
+          })}
         </ScrollView>
       )}
     </View>
@@ -592,6 +814,20 @@ function NovePodujatieForm() {
   const [miesto, setMiesto] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // Publish mode pre podujatia — pozor: ide o "kedy ho zverejniť na verejnosti",
+  // nie kedy sa koná. Samotný čas konania je datumOd + cas.
+  const [publishMode, setPublishMode] = useState<PublishMode>('ihned')
+  const [publishDate, setPublishDate] = useState('')
+  const [publishTime, setPublishTime] = useState('')
+
+  function parsePublishIso(): string | null {
+    if (!publishDate) return null
+    const t = publishTime || '08:00'
+    const d = new Date(`${publishDate}T${t}:00`)
+    if (isNaN(d.getTime())) return null
+    return d.toISOString()
+  }
+
   async function ulozPodujatie() {
     if (title.trim().length < 3) {
       Alert.alert('Chýba názov', 'Názov musí mať aspoň 3 znaky.')
@@ -601,22 +837,49 @@ function NovePodujatieForm() {
       Alert.alert('Chýba dátum', 'Zadajte dátum podujatia.')
       return
     }
+
+    // Validácia naplánovania zverejnenia
+    let publishIso: string | null = null
+    if (publishMode === 'naplanovat') {
+      publishIso = parsePublishIso()
+      if (!publishIso) {
+        Alert.alert('Neplatný čas zverejnenia', 'Zadajte dátum a čas kedy sa má podujatie zverejniť občanom.')
+        return
+      }
+      if (new Date(publishIso).getTime() < Date.now() - 60000) {
+        Alert.alert('Čas v minulosti', 'Naplánovaný čas zverejnenia musí byť v budúcnosti.')
+        return
+      }
+    }
+
     const datum = new Date(`${datumOd}T${cas || '00:00'}`)
     setLoading(true)
-    const { error } = await supabase.from('podujatia').insert({
+
+    const record: any = {
       title: title.trim(),
       popis: popis.trim() || null,
       kategoria,
       datum_od: datum.toISOString(),
       miesto: miesto.trim() || null,
-      is_published: true,
-    })
+      is_published: publishMode !== 'koncept',
+    }
+    // publish_at len ak je definovaný — DB ho ignoruje ak stĺpec neexistuje
+    if (publishMode === 'naplanovat') record.publish_at = publishIso
+    else if (publishMode === 'ihned') record.publish_at = new Date().toISOString()
+    else record.publish_at = null
+
+    const { error } = await supabase.from('podujatia').insert(record)
     setLoading(false)
     if (error) {
-      Alert.alert('Chyba', 'Podujatie sa nepodarilo uložiť.')
+      Alert.alert('Chyba', 'Podujatie sa nepodarilo uložiť.\n\n' + error.message)
     } else {
-      Alert.alert('Hotovo!', 'Podujatie bolo pridané do kalendára.')
+      const sprava =
+        publishMode === 'ihned'      ? 'Podujatie pridané a zverejnené.'
+      : publishMode === 'naplanovat' ? `Pridané, zverejnené bude ${new Date(publishIso!).toLocaleString('sk-SK', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}.`
+      :                                 'Uložené ako koncept.'
+      Alert.alert('Hotovo!', sprava)
       setTitle(''); setPopis(''); setDatumOd(''); setCas(''); setMiesto(''); setKategoria('ine')
+      setPublishDate(''); setPublishTime('')
     }
   }
 
@@ -657,12 +920,97 @@ function NovePodujatieForm() {
           placeholder="Krátky popis podujatia..."
           placeholderTextColor={C.textPlaceholder} value={popis} onChangeText={setPopis}
           multiline textAlignVertical="top" />
+
+        {/* Zverejnenie — 3 stavy */}
+        <Text style={styles.formLabel}>Zverejnenie</Text>
+        <View style={publishStyles.modeRow}>
+          <PublishModeBtn
+            emoji="💾"
+            label="Koncept"
+            sub="Iba uložiť"
+            active={publishMode === 'koncept'}
+            onPress={() => setPublishMode('koncept')}
+          />
+          <PublishModeBtn
+            emoji="🚀"
+            label="Ihneď"
+            sub="Zverejniť teraz"
+            active={publishMode === 'ihned'}
+            onPress={() => setPublishMode('ihned')}
+          />
+          <PublishModeBtn
+            emoji="🕒"
+            label="Naplánovať"
+            sub="V určitý čas"
+            active={publishMode === 'naplanovat'}
+            onPress={() => setPublishMode('naplanovat')}
+          />
+        </View>
+
+        {publishMode === 'naplanovat' && (
+          <View style={publishStyles.scheduleBox}>
+            <Text style={publishStyles.scheduleHint}>
+              📅 Podujatie sa objaví v kalendári občanov v tento čas. Samotné konanie podujatia
+              sa nemení ({datumOd || 'dátum'} {cas || ''}).
+            </Text>
+            <View style={publishStyles.scheduleRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.formLabel, { marginBottom: 6 }]}>Zverejniť dňa *</Text>
+                <TextInput
+                  style={[styles.input, { marginBottom: 0 }]}
+                  placeholder="2026-06-15"
+                  placeholderTextColor={C.textPlaceholder}
+                  value={publishDate}
+                  onChangeText={setPublishDate}
+                  keyboardType="numbers-and-punctuation"
+                />
+              </View>
+              <View style={{ width: 110 }}>
+                <Text style={[styles.formLabel, { marginBottom: 6 }]}>Čas</Text>
+                <TextInput
+                  style={[styles.input, { marginBottom: 0 }]}
+                  placeholder="08:00"
+                  placeholderTextColor={C.textPlaceholder}
+                  value={publishTime}
+                  onChangeText={setPublishTime}
+                  keyboardType="numbers-and-punctuation"
+                />
+              </View>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                <SchedulePreset label="Zajtra 8:00" onPress={() => {
+                  const d = new Date(); d.setDate(d.getDate() + 1)
+                  setPublishDate(d.toISOString().slice(0, 10)); setPublishTime('08:00')
+                }} />
+                <SchedulePreset label="Týždeň pred" onPress={() => {
+                  if (!datumOd) { Alert.alert('Najprv dátum konania', 'Zadajte dátum konania podujatia.'); return }
+                  const d = new Date(datumOd)
+                  d.setDate(d.getDate() - 7)
+                  setPublishDate(d.toISOString().slice(0, 10)); setPublishTime('08:00')
+                }} />
+                <SchedulePreset label="O hodinu" onPress={() => {
+                  const d = new Date(Date.now() + 60 * 60 * 1000)
+                  setPublishDate(d.toISOString().slice(0, 10))
+                  setPublishTime(d.toTimeString().slice(0, 5))
+                }} />
+              </View>
+            </ScrollView>
+          </View>
+        )}
+
         <TouchableOpacity
-          style={[styles.submitBtn, loading && { opacity: 0.6 }]}
+          style={[styles.submitBtn, loading && { opacity: 0.6 }, { marginTop: 16 }]}
           onPress={ulozPodujatie} disabled={loading}
         >
-          {loading ? <ActivityIndicator color={C.onPrimary} />
-            : <Text style={styles.submitBtnText}>📅 Pridať do kalendára</Text>}
+          {loading
+            ? <ActivityIndicator color={C.onPrimary} />
+            : <Text style={styles.submitBtnText}>
+                {publishMode === 'ihned'      ? '🚀 Pridať a zverejniť'
+               : publishMode === 'naplanovat' ? '🕒 Naplánovať zverejnenie'
+               :                                 '💾 Uložiť koncept'}
+              </Text>
+          }
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -1191,6 +1539,81 @@ function HlasenieKarta({ hlasenie: h, updating, onZmenStatus }: {
     </View>
   )
 }
+
+// ─── Publish mode helper komponenty ───────────────────────────────────────
+function PublishModeBtn({ emoji, label, sub, active, onPress }: {
+  emoji: string; label: string; sub: string; active: boolean; onPress: () => void
+}) {
+  return (
+    <TouchableOpacity
+      style={[publishStyles.modeBtn, active && publishStyles.modeBtnActive]}
+      onPress={onPress}
+      activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+    >
+      <Text style={publishStyles.modeEmoji}>{emoji}</Text>
+      <Text style={[publishStyles.modeLabel, active && { color: C.primary }]}>{label}</Text>
+      <Text style={[publishStyles.modeSub, active && { color: C.primary }]} numberOfLines={2}>{sub}</Text>
+    </TouchableOpacity>
+  )
+}
+
+function SchedulePreset({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <TouchableOpacity
+      style={publishStyles.preset}
+      onPress={onPress}
+      activeOpacity={0.75}
+    >
+      <Text style={publishStyles.presetText}>{label}</Text>
+    </TouchableOpacity>
+  )
+}
+
+const publishStyles = StyleSheet.create({
+  modeRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  modeBtn: {
+    flex: 1,
+    backgroundColor: C.surfaceAlt,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    alignItems: 'center',
+    gap: 4,
+    minHeight: 90,
+  },
+  modeBtnActive: {
+    backgroundColor: C.primaryLight,
+    borderColor: C.primary,
+  },
+  modeEmoji: { fontSize: 24 },
+  modeLabel: { fontSize: 13, fontWeight: '800', color: C.text, letterSpacing: 0.1 },
+  modeSub: { fontSize: 10, color: C.textMuted, textAlign: 'center', fontWeight: '600', lineHeight: 13 },
+
+  scheduleBox: {
+    backgroundColor: C.surfaceAlt,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 4,
+    borderLeftWidth: 4,
+    borderLeftColor: C.primary,
+  },
+  scheduleHint: {
+    fontSize: 12, color: C.textSecondary, marginBottom: 12, lineHeight: 17, fontWeight: '600',
+  },
+  scheduleRow: { flexDirection: 'row', gap: 10 },
+
+  preset: {
+    backgroundColor: C.surface,
+    borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderWidth: 1, borderColor: C.border,
+  },
+  presetText: { fontSize: 12, color: C.textSecondary, fontWeight: '700' },
+})
 
 // ─── FARSKÉ OZNAMY — admin podtab ─────────────────────────────────────────
 function FarskeOznamyAdmin() {

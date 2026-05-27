@@ -275,6 +275,14 @@ ALTER TABLE public.obecne_zariadenia
 -- doplniť ako nový riadok cez Supabase Table editor.
 
 -- ════════════════════════════════════════════════════════════════════════
+-- Plánované publikovanie podujatí (publish_at — kedy zverejniť na verejnosti)
+-- Pre aktuality používame existujúci stĺpec published_at.
+-- ════════════════════════════════════════════════════════════════════════
+ALTER TABLE public.podujatia
+  ADD COLUMN IF NOT EXISTS publish_at timestamptz;
+CREATE INDEX IF NOT EXISTS podujatia_publish_at_idx ON public.podujatia(publish_at);
+
+-- ════════════════════════════════════════════════════════════════════════
 -- FARSKÉ OZNAMY — omše, smútočné, krsty, sobáše, ohlášky
 -- ════════════════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS public.farske_oznamy (
