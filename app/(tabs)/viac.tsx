@@ -1,141 +1,61 @@
 /**
  * "Viac" menu — všetky sekundárne obrazovky na jednom mieste.
  *
- * Grid kariet s ikonou a popisom. Admin a Správa obce sú vždy
+ * Zoznam kariet s ikonou a popisom. Admin a Správa obce sú vždy
  * zobrazené — autorizácia sa rieši až na cieľovej obrazovke.
+ *
+ * Ikony: jednotný <Icon> systém. Interakcie: PressableScale. Plne theme-aware.
  */
 
 import { AppHeader } from '@/components/AppHeader'
+import { Accordion, AtmosphereBackground, Counter, Icon, IconName, IconTile, PressableScale } from '@/components/ui'
 import { C } from '@/constants/colors'
+import { useTenant } from '@/src/config/tenant'
 import { ThemeMode, useThemeMode } from '@/src/theme/ThemeContext'
+import { fonts, radius, shadows, spacing, typo } from '@/src/theme/tokens'
 import { useRouter } from 'expo-router'
-import { Alert, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 type MenuItem = {
   id: string
-  emoji: string
+  icon: IconName
   title: string
   subtitle?: string
   path?: string
-  farba: string
+  gradient: readonly [string, string, ...string[]]
   onPress?: () => void
 }
 
+const FAQ = [
+  { q: 'Ako nahlásim problém v obci?', a: 'Na Domove cez „Nahlásiť podnet" alebo v menu „Hlásenie porúch". Priložte fotku a polohu — úrad podnet vidí okamžite a môžete sledovať jeho stav.' },
+  { q: 'Ako funguje AI referentka Marta?', a: 'Marta odpovedá na otázky o obci 24/7 — úradné hodiny, vývoz odpadu, dokumenty, kontakty. Stačí sa opýtať bežnou rečou.' },
+  { q: 'Odkiaľ sú aktuality a oznamy?', a: 'Synchronizujú sa automaticky z oficiálneho webu obce, takže sú vždy aktuálne bez duplicitnej práce úradu.' },
+  { q: 'Kde nájdem úradné hodiny a kontakty?', a: 'V sekcii „Kontakty" — telefón, e-mail aj úradné hodiny obecného úradu. Volať môžete priamo z appky.' },
+]
+
 export default function ViacScreen() {
   const router = useRouter()
+  const t = useThemeMode().colors
+  const tenant = useTenant()
   const { mode, setMode, scheme } = useThemeMode()
 
   const items: MenuItem[] = [
+    { id: 'prenajom',          icon: 'prenajom',   title: 'Prenájom haly',       subtitle: 'Rezervujte si športovú halu',                 path: '/prenajom',          gradient: C.gradients.gold },
+    { id: 'kontakty',          icon: 'kontakty',   title: 'Kontakty',            subtitle: 'Obecný úrad a zamestnanci',                   path: '/kontakty',          gradient: C.gradients.slate },
+    { id: 'podujatia',         icon: 'podujatia',  title: 'Podujatia',           subtitle: 'Kalendár obecných akcií',                     path: '/podujatia',         gradient: C.gradients.green },
+    { id: 'fc',                icon: 'fc',         title: 'FC Výčapy-Opatovce',  subtitle: 'Oblastná liga · Program, výsledky, káder',    path: '/fc',                gradient: C.gradients.indigo },
+    { id: 'referentka',        icon: 'marta',      title: 'AI Referentka Marta', subtitle: 'Online 24/7 · Odpovedá na otázky o obci',     path: '/referentka',        gradient: C.gradients.purple },
+    { id: 'sluzby',            icon: 'sluzby',     title: 'Služby v obci',       subtitle: 'Lekár, lekáreň, pošta, fara, veterina',       path: '/sluzby',            gradient: C.gradients.teal },
+    { id: 'farske-oznamy',     icon: 'farske',     title: 'Farské oznamy',       subtitle: 'Omše, smútočné, ohlášky',                     path: '/farske-oznamy',     gradient: C.gradients.brown },
+    { id: 'okolie',            icon: 'okolie',     title: 'Voľný čas v okolí',   subtitle: 'Cyklotrasy, výlety, kam s deťmi · do 50 km',  path: '/okolie',            gradient: C.gradients.green },
+    { id: 'cestovny-poriadok', icon: 'cestovny',   title: 'Cestovný poriadok',   subtitle: 'Autobusy a vlaky cez obec',                   path: '/cestovny-poriadok', gradient: C.gradients.orange },
+    { id: 'pocasie',           icon: 'pocasie',    title: 'Počasie',             subtitle: 'Predpoveď 7 dní + kvalita vzduchu',           path: '/pocasie',           gradient: C.gradients.blue },
+    { id: 'meteo-stanice',     icon: 'meteo',      title: 'Meteo stanice obce',  subtitle: 'Kvalita vzduchu, teplota, vlhkosť v reálnom čase', path: '/meteo-stanice',  gradient: C.gradients.teal },
+    { id: 'ankety',            icon: 'ankety',     title: 'Ankety obce',         subtitle: 'Hlasujte o dôležitých otázkach',              path: '/ankety',            gradient: C.gradients.pink },
+    { id: 'hlasenie',          icon: 'hlasenie',   title: 'Hlásenie porúch',     subtitle: 'Nahláste problém v obci',                     path: '/hlasenie',          gradient: C.gradients.red },
     {
-      id: 'prenajom',
-      emoji: '🏟️',
-      title: 'Prenájom haly',
-      subtitle: 'Rezervujte si športovú halu',
-      path: '/prenajom',
-      farba: C.brand.gold,
-    },
-    {
-      id: 'kontakty',
-      emoji: '📞',
-      title: 'Kontakty',
-      subtitle: 'Obecný úrad a zamestnanci',
-      path: '/kontakty',
-      farba: '#37474F',
-    },
-    {
-      id: 'podujatia',
-      emoji: '📅',
-      title: 'Podujatia',
-      subtitle: 'Kalendár obecných akcií',
-      path: '/podujatia',
-      farba: C.brand.green,
-    },
-    {
-      id: 'fc',
-      emoji: '⚽',
-      title: 'FC Výčapy-Opatovce',
-      subtitle: 'Oblastná liga · Program, výsledky, káder',
-      path: '/fc',
-      farba: '#1B5E20',
-    },
-    {
-      id: 'referentka',
-      emoji: '🤖',
-      title: 'AI Referentka Marta',
-      subtitle: 'Online 24/7 · Odpovedá na otázky o obci',
-      path: '/referentka',
-      farba: '#6A1B9A',
-    },
-    {
-      id: 'sluzby',
-      emoji: '🏥',
-      title: 'Služby v obci',
-      subtitle: 'Lekár, lekáreň, pošta, fara, veterina',
-      path: '/sluzby',
-      farba: '#00838F',
-    },
-    {
-      id: 'farske-oznamy',
-      emoji: '⛪',
-      title: 'Farské oznamy',
-      subtitle: 'Omše, smútočné, ohlášky',
-      path: '/farske-oznamy',
-      farba: '#5D4037',
-    },
-    {
-      id: 'okolie',
-      emoji: '🌍',
-      title: 'Voľný čas v okolí',
-      subtitle: 'Cyklotrasy, výlety, kam s deťmi · do 50 km',
-      path: '/okolie',
-      farba: '#0277BD',
-    },
-    {
-      id: 'cestovny-poriadok',
-      emoji: '🚌',
-      title: 'Cestovný poriadok',
-      subtitle: 'Autobusy a vlaky cez obec',
-      path: '/cestovny-poriadok',
-      farba: '#F57F17',
-    },
-    {
-      id: 'pocasie',
-      emoji: '☁️',
-      title: 'Počasie',
-      subtitle: 'Predpoveď 7 dní + kvalita vzduchu',
-      path: '/pocasie',
-      farba: '#0277BD',
-    },
-    {
-      id: 'meteo-stanice',
-      emoji: '📡',
-      title: 'Meteo stanice obce',
-      subtitle: 'Kvalita vzduchu, teplota, vlhkosť v reálnom čase',
-      path: '/meteo-stanice',
-      farba: '#00838F',
-    },
-    {
-      id: 'ankety',
-      emoji: '🗳️',
-      title: 'Ankety obce',
-      subtitle: 'Hlasujte o dôležitých otázkach',
-      path: '/ankety',
-      farba: '#7B1FA2',
-    },
-    {
-      id: 'hlasenie',
-      emoji: '⚠️',
-      title: 'Hlásenie porúch',
-      subtitle: 'Nahláste problém v obci',
-      path: '/hlasenie',
-      farba: C.brand.red,
-    },
-    {
-      id: 'senior',
-      emoji: '👴',
-      title: 'Senior mód',
-      subtitle: 'Veľké písmo, jednoduché ovládanie',
-      farba: '#5D4037',
+      id: 'senior', icon: 'senior', title: 'Senior mód', subtitle: 'Veľké písmo, jednoduché ovládanie', gradient: C.gradients.brown,
       onPress: () => {
         Alert.alert(
           'Senior mód',
@@ -147,98 +67,110 @@ export default function ViacScreen() {
         )
       },
     },
-    {
-      id: 'starosta',
-      emoji: '💡',
-      title: 'Správa obce',
-      subtitle: 'Smart obec — IoT a infraštruktúra',
-      path: '/starosta-dashboard',
-      farba: '#0D47A1',
-    },
-    {
-      id: 'mapa',
-      emoji: '🗺️',
-      title: 'Mapa obce',
-      subtitle: 'Osvetlenie, senzory, hlásenia na mape',
-      path: '/mapa',
-      farba: '#0D47A1',
-    },
-    {
-      id: 'admin',
-      emoji: '🔐',
-      title: 'Admin panel',
-      subtitle: 'Pre poverené osoby úradu',
-      path: '/admin',
-      farba: C.primaryDark,
-    },
+    { id: 'starosta', icon: 'spravaObce', title: 'Správa obce',  subtitle: 'Smart obec — IoT a infraštruktúra',     path: '/starosta-dashboard', gradient: C.gradients.indigo },
+    { id: 'mapa',     icon: 'mapa',       title: 'Mapa obce',    subtitle: 'Osvetlenie, senzory, hlásenia na mape', path: '/mapa',               gradient: C.gradients.blue },
+    { id: 'admin',    icon: 'admin',      title: 'Admin panel',  subtitle: 'Pre poverené osoby úradu',              path: '/admin',              gradient: C.gradients.slate },
   ]
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={C.surface} />
-
+    <SafeAreaView style={[styles.safe, { backgroundColor: t.background }]} edges={['top']}>
+      <AtmosphereBackground />
       <AppHeader title="Viac" subtitle="Všetky funkcie aplikácie" />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.grid}>
           {items.map(item => (
-            <TouchableOpacity
+            <PressableScale
               key={item.id}
-              style={styles.karta}
-              activeOpacity={0.8}
+              style={[styles.karta, { backgroundColor: t.surface, shadowColor: t.shadow }]}
               onPress={() => {
                 if (item.onPress) item.onPress()
                 else if (item.path) router.push(item.path as never)
               }}
+              accessibilityLabel={item.title}
             >
-              <View style={[styles.iconBox, { backgroundColor: item.farba + '18' }]}>
-                <Text style={styles.emoji}>{item.emoji}</Text>
-              </View>
+              <IconTile name={item.icon} gradient={item.gradient} size={48} iconSize={24} glow />
               <View style={{ flex: 1 }}>
-                <Text style={styles.title}>{item.title}</Text>
+                <Text style={[styles.title, { color: t.text }]}>{item.title}</Text>
                 {item.subtitle && (
-                  <Text style={styles.subtitle} numberOfLines={1}>{item.subtitle}</Text>
+                  <Text style={[styles.subtitle, { color: t.textMuted }]} numberOfLines={1}>{item.subtitle}</Text>
                 )}
               </View>
-              <Text style={styles.chevron}>›</Text>
-            </TouchableOpacity>
+              <Icon name="chevron" size={20} color={t.textPlaceholder} />
+            </PressableScale>
           ))}
         </View>
 
-        {/* Tmavý režim prepínač */}
-        <View style={styles.themeBox}>
-          <Text style={styles.themeTitle}>🌓 Vzhľad aplikácie</Text>
+        {/* Vzhľad aplikácie — prepínač témy */}
+        <View style={[styles.themeBox, { backgroundColor: t.surface, shadowColor: t.shadow }]}>
+          <Text style={[styles.themeTitle, { color: t.text }]}>Vzhľad aplikácie</Text>
           <View style={styles.themeRow}>
             {(['light', 'auto', 'dark'] as ThemeMode[]).map(m => {
-              const labels = { light: '☀️ Svetlý', auto: '⚙️ Auto', dark: '🌙 Tmavý' }
+              const meta: Record<ThemeMode, { label: string; icon: IconName }> = {
+                light: { label: 'Svetlý', icon: 'sun' },
+                auto:  { label: 'Auto',   icon: 'settings' },
+                dark:  { label: 'Tmavý',  icon: 'moon' },
+              }
               const active = mode === m
               return (
-                <TouchableOpacity
+                <PressableScale
                   key={m}
-                  style={[styles.themeBtn, active && styles.themeBtnActive]}
+                  style={[
+                    styles.themeBtn,
+                    { backgroundColor: t.surfaceAlt, borderColor: 'transparent' },
+                    active && { backgroundColor: t.primaryLight, borderColor: t.primary },
+                  ]}
+                  scaleTo={0.95}
                   onPress={() => setMode(m)}
-                  activeOpacity={0.75}
+                  accessibilityLabel={`Vzhľad: ${meta[m].label}`}
                 >
-                  <Text style={[styles.themeBtnText, active && styles.themeBtnTextActive]}>
-                    {labels[m]}
+                  <Icon name={meta[m].icon} size={18} color={active ? t.primary : t.textSecondary} />
+                  <Text style={[styles.themeBtnText, { color: active ? t.primary : t.textSecondary }]}>
+                    {meta[m].label}
                   </Text>
-                </TouchableOpacity>
+                </PressableScale>
               )
             })}
           </View>
-          <Text style={styles.themeHint}>
+          <Text style={[styles.themeHint, { color: t.textMuted }]}>
             Aktuálne: {scheme === 'dark' ? 'Tmavý režim' : 'Svetlý režim'}
             {mode === 'auto' && ' (podľa systému)'}
           </Text>
         </View>
 
+        {/* Obec v číslach — animované počítadlá */}
+        <View style={[styles.statsCard, { backgroundColor: t.surface, shadowColor: t.shadow }]}>
+          <View style={styles.statCell}>
+            <Counter value={tenant.pocetObyvatelov ?? 1900} style={[styles.statNum, { color: t.primary }]} />
+            <Text style={[styles.statLabel, { color: t.textMuted }]}>Obyvateľov</Text>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: t.borderLight }]} />
+          <View style={styles.statCell}>
+            <Counter value={items.length} style={[styles.statNum, { color: t.primary }]} />
+            <Text style={[styles.statLabel, { color: t.textMuted }]}>Funkcií</Text>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: t.borderLight }]} />
+          <View style={styles.statCell}>
+            <Text style={[styles.statNum, { color: t.primary }]}>24/7</Text>
+            <Text style={[styles.statLabel, { color: t.textMuted }]}>AI podpora</Text>
+          </View>
+        </View>
+
+        {/* Časté otázky — accordion */}
+        <Text style={[styles.faqHeading, { color: t.text }]}>Časté otázky</Text>
+        {FAQ.map((f, i) => (
+          <Accordion key={i} title={f.q} icon="info" defaultOpen={i === 0}>
+            {f.a}
+          </Accordion>
+        ))}
+
         <View style={styles.about}>
-          <Text style={styles.aboutTitle}>O aplikácii</Text>
-          <Text style={styles.aboutText}>
+          <Text style={[styles.aboutTitle, { color: t.textMuted }]}>O aplikácii</Text>
+          <Text style={[styles.aboutText, { color: t.textSecondary }]}>
             Oficiálna aplikácia obce Výčapy-Opatovce. Slúži na komunikáciu obecného úradu
             s občanmi, hlásenie porúch, prehľad podujatí a aktualít.
           </Text>
-          <Text style={styles.aboutVersion}>Verzia 1.0.0</Text>
+          <Text style={[styles.aboutVersion, { color: t.textPlaceholder }]}>Verzia 1.0.0</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -246,75 +178,63 @@ export default function ViacScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.background },
-  content: { padding: 16, paddingBottom: 24 },
-  grid: { gap: 10 },
+  safe: { flex: 1 },
+  content: { padding: spacing.lg, paddingBottom: spacing.xl },
+  grid: { gap: spacing.sm },
 
   karta: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: C.surface,
-    borderRadius: 14,
-    padding: 14,
-    gap: 14,
-    shadowColor: C.shadow,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    gap: spacing.md,
+    ...shadows.sm,
   },
   iconBox: {
-    width: 52, height: 52, borderRadius: 14,
+    width: 48, height: 48, borderRadius: radius.md,
     justifyContent: 'center', alignItems: 'center',
   },
-  emoji: { fontSize: 26 },
-  title: { fontSize: 16, fontWeight: '700', color: C.text },
-  subtitle: { fontSize: 12, color: C.textMuted, marginTop: 2 },
-  chevron: { fontSize: 28, color: C.textPlaceholder, fontWeight: '300' },
+  title: { ...typo.h3 },
+  subtitle: { ...typo.caption, marginTop: 2 },
 
   // Theme switcher
   themeBox: {
-    marginTop: 24,
-    backgroundColor: C.surface,
-    borderRadius: 14,
-    padding: 14,
-    shadowColor: C.shadow,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    marginTop: spacing.xl,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    ...shadows.sm,
   },
-  themeTitle: {
-    fontSize: 14, fontWeight: '800', color: C.text,
-    marginBottom: 10,
-  },
-  themeRow: { flexDirection: 'row', gap: 8 },
+  themeTitle: { ...typo.bodyB, marginBottom: spacing.md },
+  themeRow: { flexDirection: 'row', gap: spacing.sm },
   themeBtn: {
-    flex: 1, paddingVertical: 10,
-    backgroundColor: C.surfaceAlt,
-    borderRadius: 10,
-    borderWidth: 1, borderColor: 'transparent',
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
+    gap: 6,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
   },
-  themeBtnActive: {
-    backgroundColor: C.primaryLight,
-    borderColor: C.primary,
-  },
-  themeBtnText: { fontSize: 12, fontWeight: '700', color: C.textSecondary },
-  themeBtnTextActive: { color: C.primary },
-  themeHint: {
-    fontSize: 11, color: C.textMuted,
-    textAlign: 'center', marginTop: 8,
-  },
+  themeBtnText: { fontSize: 13, fontWeight: '700' },
+  themeHint: { ...typo.micro, textAlign: 'center', marginTop: spacing.md },
 
-  about: {
-    marginTop: 24,
-    paddingHorizontal: 4,
+  // Obec v číslach
+  statsCard: {
+    flexDirection: 'row', alignItems: 'center',
+    marginTop: spacing.xl, borderRadius: radius.lg, padding: spacing.lg,
+    ...shadows.sm,
   },
-  aboutTitle: {
-    fontSize: 11, fontWeight: '800', color: C.textMuted,
-    letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8,
-  },
-  aboutText: { fontSize: 13, color: C.textSecondary, lineHeight: 19 },
-  aboutVersion: { fontSize: 11, color: C.textPlaceholder, marginTop: 12 },
+  statCell: { flex: 1, alignItems: 'center', gap: 4 },
+  statNum: { fontFamily: fonts.display, fontSize: 26, letterSpacing: -0.5 },
+  statLabel: { ...typo.micro, textTransform: 'uppercase', letterSpacing: 0.6 },
+  statDivider: { width: 1, height: 34 },
+
+  // FAQ
+  faqHeading: { ...typo.h1, marginTop: spacing.xl, marginBottom: spacing.md },
+
+  about: { marginTop: spacing.xl, paddingHorizontal: spacing.xs },
+  aboutTitle: { ...typo.label, marginBottom: spacing.sm },
+  aboutText: { ...typo.caption, lineHeight: 19 },
+  aboutVersion: { ...typo.micro, marginTop: spacing.md },
 })

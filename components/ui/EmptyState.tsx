@@ -13,13 +13,13 @@
 
 import { useThemeColors } from '@/src/theme/ThemeContext'
 import { spacing, typo } from '@/src/theme/tokens'
-// React node import bol nepotrebný — secondaryAction zostal ako ReactNode v Props
 import { ReactNode } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import Button from './Button'
+import Icon, { IconName } from './Icon'
 
 type Props = {
-  icon?: string
+  icon?: IconName
   title: string
   description?: string
   actionLabel?: string
@@ -28,7 +28,7 @@ type Props = {
 }
 
 export function EmptyState({
-  icon = '📭',
+  icon = 'aktuality',
   title,
   description,
   actionLabel,
@@ -38,7 +38,9 @@ export function EmptyState({
   const t = useThemeColors()
   return (
     <View style={styles.wrap} accessibilityRole="summary">
-      <Text style={styles.icon} accessibilityElementsHidden>{icon}</Text>
+      <View style={[styles.iconHalo, { backgroundColor: t.surfaceAlt }]}>
+        <Icon name={icon} size={36} color={t.textMuted} />
+      </View>
       <Text style={[styles.title, { color: t.text }]}>{title}</Text>
       {description && (
         <Text style={[styles.desc, { color: t.textMuted }]}>{description}</Text>
@@ -60,7 +62,11 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xxl,
     gap: spacing.sm,
   },
-  icon: { fontSize: 56, marginBottom: spacing.sm },
+  iconHalo: {
+    width: 72, height: 72, borderRadius: 36,
+    justifyContent: 'center', alignItems: 'center',
+    marginBottom: spacing.md,
+  },
   title: { ...typo.h2, textAlign: 'center' },
   desc: { ...typo.body, textAlign: 'center' },
 })

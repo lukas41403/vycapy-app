@@ -1,5 +1,6 @@
 import { ErbBadge } from '@/components/AppHeader'
 import { C } from '@/constants/colors'
+import { ThemeColors, useThemeColors } from '@/src/theme/ThemeContext'
 import { supabase } from '@/src/lib/supabase'
 import { Image } from 'expo-image'
 // ── expo-image-picker ─────────────────────────────────────────────────────
@@ -9,7 +10,7 @@ import { Image } from 'expo-image'
 const ImagePicker: any = null
 // ──────────────────────────────────────────────────────────────────────────
 import { useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -118,6 +119,9 @@ const PODUJATIE_KATEGORIE = [
 ]
 
 export default function AdminScreen() {
+  const t = useThemeColors()
+  const styles = useMemo(() => makeStyles(t), [t])
+
   const [aktTab, setAktTab] = useState<'prehlad' | 'hlasenia' | 'aktuality' | 'podujatia' | 'prenajmy' | 'ankety' | 'farske'>('prehlad')
   const [hlasenia, setHlasenia] = useState<Hlasenie[]>([])
   const [loading, setLoading] = useState(true)
@@ -172,7 +176,7 @@ export default function AdminScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={C.primary} />
+          <ActivityIndicator size="large" color={t.primary} />
         </View>
       </SafeAreaView>
     )
@@ -182,7 +186,7 @@ export default function AdminScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={C.primary} />
+      <StatusBar barStyle="light-content" backgroundColor={t.primary} />
 
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -295,7 +299,7 @@ export default function AdminScreen() {
       ) : aktTab === 'hlasenia' ? (
         loading ? (
           <View style={styles.center}>
-            <ActivityIndicator size="large" color={C.primary} />
+            <ActivityIndicator size="large" color={t.primary} />
           </View>
         ) : (
           <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
@@ -341,6 +345,10 @@ export default function AdminScreen() {
 type PublishMode = 'koncept' | 'ihned' | 'naplanovat'
 
 function NovAktualitaForm() {
+  const t = useThemeColors()
+  const styles = useMemo(() => makeStyles(t), [t])
+  const publishStyles = useMemo(() => makePublishStyles(t), [t])
+
   const [podtab, setPodtab] = useState<'nova' | 'zoznam'>('nova')
   const [aktuality, setAktuality] = useState<AktualitaItem[]>([])
   const [nacitavam, setNacitavam] = useState(false)
@@ -546,10 +554,10 @@ function NovAktualitaForm() {
               ) : (
                 <View style={styles.coverPickerPlaceholder}>
                   <Text style={{ fontSize: 32 }}>🖼️</Text>
-                  <Text style={{ fontSize: 13, color: C.textMuted, marginTop: 8, fontWeight: '600' }}>
+                  <Text style={{ fontSize: 13, color: t.textMuted, marginTop: 8, fontWeight: '600' }}>
                     Klikni pre výber fotky
                   </Text>
-                  <Text style={{ fontSize: 11, color: C.textPlaceholder, marginTop: 2 }}>
+                  <Text style={{ fontSize: 11, color: t.textPlaceholder, marginTop: 2 }}>
                     Pomer 16:9 odporúčaný
                   </Text>
                 </View>
@@ -558,14 +566,14 @@ function NovAktualitaForm() {
 
             <Text style={styles.formLabel}>Titulok *</Text>
             <TextInput style={styles.input} placeholder="Titulok aktuality..."
-              placeholderTextColor={C.textPlaceholder} value={title} onChangeText={setTitle} />
+              placeholderTextColor={t.textPlaceholder} value={title} onChangeText={setTitle} />
             <Text style={styles.formLabel}>Perex (krátky úvod)</Text>
             <TextInput style={[styles.input, { height: 80 }]}
-              placeholder="Krátky popis..." placeholderTextColor={C.textPlaceholder}
+              placeholder="Krátky popis..." placeholderTextColor={t.textPlaceholder}
               value={perex} onChangeText={setPerex} multiline textAlignVertical="top" />
             <Text style={styles.formLabel}>Text aktuality *</Text>
             <TextInput style={[styles.input, { height: 160 }]}
-              placeholder="Celý text..." placeholderTextColor={C.textPlaceholder}
+              placeholder="Celý text..." placeholderTextColor={t.textPlaceholder}
               value={body} onChangeText={setBody} multiline textAlignVertical="top" />
             {/* Publikovanie — 3 stavy */}
             <Text style={styles.formLabel}>Publikovanie</Text>
@@ -604,7 +612,7 @@ function NovAktualitaForm() {
                     <TextInput
                       style={[styles.input, { marginBottom: 0 }]}
                       placeholder="2026-06-15"
-                      placeholderTextColor={C.textPlaceholder}
+                      placeholderTextColor={t.textPlaceholder}
                       value={scheduledDate}
                       onChangeText={setScheduledDate}
                       keyboardType="numbers-and-punctuation"
@@ -615,7 +623,7 @@ function NovAktualitaForm() {
                     <TextInput
                       style={[styles.input, { marginBottom: 0 }]}
                       placeholder="08:00"
-                      placeholderTextColor={C.textPlaceholder}
+                      placeholderTextColor={t.textPlaceholder}
                       value={scheduledTime}
                       onChangeText={setScheduledTime}
                       keyboardType="numbers-and-punctuation"
@@ -650,7 +658,7 @@ function NovAktualitaForm() {
               onPress={publikovatAktualitu} disabled={loading}
             >
               {loading
-                ? <ActivityIndicator color={C.onPrimary} />
+                ? <ActivityIndicator color={t.onPrimary} />
                 : <Text style={styles.submitBtnText}>
                     {publishMode === 'ihned'      ? '🚀 Publikovať teraz'
                    : publishMode === 'naplanovat' ? '🕒 Naplánovať'
@@ -663,7 +671,7 @@ function NovAktualitaForm() {
       ) : (
         <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
           {nacitavam ? (
-            <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }} />
+            <ActivityIndicator size="large" color={t.primary} style={{ marginTop: 40 }} />
           ) : aktuality.map(a => {
             // Určenie stavu: published / scheduled / koncept
             const now = Date.now()
@@ -674,9 +682,9 @@ function NovAktualitaForm() {
             :                                'pub'
 
             const stavMeta = {
-              pub:  { bg: C.status.success.bg, fg: C.status.success.fg, label: '✓ Pub.' },
-              plan: { bg: C.status.warning.bg, fg: C.status.warning.fg, label: '🕒 Naplán.' },
-              konc: { bg: C.status.neutral.bg, fg: C.status.neutral.fg, label: '💾 Konc.' },
+              pub:  { bg: t.status.success.bg, fg: t.status.success.fg, label: '✓ Pub.' },
+              plan: { bg: t.status.warning.bg, fg: t.status.warning.fg, label: '🕒 Naplán.' },
+              konc: { bg: t.status.neutral.bg, fg: t.status.neutral.fg, label: '💾 Konc.' },
             }[stav]
 
             return (
@@ -713,7 +721,7 @@ function NovAktualitaForm() {
                   {/* Quick action: naplánovanú aktualitu publikovať okamžite */}
                   {stav === 'plan' && (
                     <TouchableOpacity
-                      style={[styles.akciaBtn, { backgroundColor: C.status.success.bg }]}
+                      style={[styles.akciaBtn, { backgroundColor: t.status.success.bg }]}
                       onPress={async () => {
                         Alert.alert(
                           'Publikovať teraz?',
@@ -734,7 +742,7 @@ function NovAktualitaForm() {
                         )
                       }}
                     >
-                      <Text style={[styles.akciaBtnText, { color: C.status.success.fg }]}>
+                      <Text style={[styles.akciaBtnText, { color: t.status.success.fg }]}>
                         🚀 Publikovať teraz
                       </Text>
                     </TouchableOpacity>
@@ -742,7 +750,7 @@ function NovAktualitaForm() {
                   {/* Quick action: koncept publikovať teraz */}
                   {stav === 'konc' && (
                     <TouchableOpacity
-                      style={[styles.akciaBtn, { backgroundColor: C.status.success.bg }]}
+                      style={[styles.akciaBtn, { backgroundColor: t.status.success.bg }]}
                       onPress={async () => {
                         await supabase
                           .from('aktuality')
@@ -754,7 +762,7 @@ function NovAktualitaForm() {
                         nacitajAktuality()
                       }}
                     >
-                      <Text style={[styles.akciaBtnText, { color: C.status.success.fg }]}>
+                      <Text style={[styles.akciaBtnText, { color: t.status.success.fg }]}>
                         🚀 Publikovať
                       </Text>
                     </TouchableOpacity>
@@ -762,7 +770,7 @@ function NovAktualitaForm() {
                   {/* Skryť publikované */}
                   {stav === 'pub' && (
                     <TouchableOpacity
-                      style={[styles.akciaBtn, { backgroundColor: C.status.warning.bg }]}
+                      style={[styles.akciaBtn, { backgroundColor: t.status.warning.bg }]}
                       onPress={async () => {
                         Alert.alert(
                           'Skryť aktualitu?',
@@ -783,17 +791,17 @@ function NovAktualitaForm() {
                         )
                       }}
                     >
-                      <Text style={[styles.akciaBtnText, { color: C.status.warning.fg }]}>
+                      <Text style={[styles.akciaBtnText, { color: t.status.warning.fg }]}>
                         👁️‍🗨️ Skryť
                       </Text>
                     </TouchableOpacity>
                   )}
 
                   <TouchableOpacity
-                    style={[styles.akciaBtn, { backgroundColor: C.status.danger.bg }]}
+                    style={[styles.akciaBtn, { backgroundColor: t.status.danger.bg }]}
                     onPress={() => zmazAktualitu(a.id)}
                   >
-                    <Text style={[styles.akciaBtnText, { color: C.status.danger.fg }]}>🗑️ Zmazať</Text>
+                    <Text style={[styles.akciaBtnText, { color: t.status.danger.fg }]}>🗑️ Zmazať</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -806,6 +814,10 @@ function NovAktualitaForm() {
 }
 
 function NovePodujatieForm() {
+  const t = useThemeColors()
+  const styles = useMemo(() => makeStyles(t), [t])
+  const publishStyles = useMemo(() => makePublishStyles(t), [t])
+
   const [title, setTitle] = useState('')
   const [popis, setPopis] = useState('')
   const [kategoria, setKategoria] = useState('ine')
@@ -905,20 +917,20 @@ function NovePodujatieForm() {
         </ScrollView>
         <Text style={styles.formLabel}>Názov podujatia *</Text>
         <TextInput style={styles.input} placeholder="napr. Deň obce 2026"
-          placeholderTextColor={C.textPlaceholder} value={title} onChangeText={setTitle} />
+          placeholderTextColor={t.textPlaceholder} value={title} onChangeText={setTitle} />
         <Text style={styles.formLabel}>Dátum * (RRRR-MM-DD)</Text>
         <TextInput style={styles.input} placeholder="napr. 2026-06-15"
-          placeholderTextColor={C.textPlaceholder} value={datumOd} onChangeText={setDatumOd} />
+          placeholderTextColor={t.textPlaceholder} value={datumOd} onChangeText={setDatumOd} />
         <Text style={styles.formLabel}>Čas (HH:MM)</Text>
         <TextInput style={styles.input} placeholder="napr. 15:00"
-          placeholderTextColor={C.textPlaceholder} value={cas} onChangeText={setCas} />
+          placeholderTextColor={t.textPlaceholder} value={cas} onChangeText={setCas} />
         <Text style={styles.formLabel}>Miesto</Text>
         <TextInput style={styles.input} placeholder="napr. Kultúrny dom"
-          placeholderTextColor={C.textPlaceholder} value={miesto} onChangeText={setMiesto} />
+          placeholderTextColor={t.textPlaceholder} value={miesto} onChangeText={setMiesto} />
         <Text style={styles.formLabel}>Popis</Text>
         <TextInput style={[styles.input, { height: 100 }]}
           placeholder="Krátky popis podujatia..."
-          placeholderTextColor={C.textPlaceholder} value={popis} onChangeText={setPopis}
+          placeholderTextColor={t.textPlaceholder} value={popis} onChangeText={setPopis}
           multiline textAlignVertical="top" />
 
         {/* Zverejnenie — 3 stavy */}
@@ -959,7 +971,7 @@ function NovePodujatieForm() {
                 <TextInput
                   style={[styles.input, { marginBottom: 0 }]}
                   placeholder="2026-06-15"
-                  placeholderTextColor={C.textPlaceholder}
+                  placeholderTextColor={t.textPlaceholder}
                   value={publishDate}
                   onChangeText={setPublishDate}
                   keyboardType="numbers-and-punctuation"
@@ -970,7 +982,7 @@ function NovePodujatieForm() {
                 <TextInput
                   style={[styles.input, { marginBottom: 0 }]}
                   placeholder="08:00"
-                  placeholderTextColor={C.textPlaceholder}
+                  placeholderTextColor={t.textPlaceholder}
                   value={publishTime}
                   onChangeText={setPublishTime}
                   keyboardType="numbers-and-punctuation"
@@ -1004,7 +1016,7 @@ function NovePodujatieForm() {
           onPress={ulozPodujatie} disabled={loading}
         >
           {loading
-            ? <ActivityIndicator color={C.onPrimary} />
+            ? <ActivityIndicator color={t.onPrimary} />
             : <Text style={styles.submitBtnText}>
                 {publishMode === 'ihned'      ? '🚀 Pridať a zverejniť'
                : publishMode === 'naplanovat' ? '🕒 Naplánovať zverejnenie'
@@ -1018,6 +1030,9 @@ function NovePodujatieForm() {
 }
 
 function PrenajmyZoznam() {
+  const t = useThemeColors()
+  const styles = useMemo(() => makeStyles(t), [t])
+
   const [ziadosti, setZiadosti] = useState<PrenajomZiadost[]>([])
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
@@ -1066,7 +1081,7 @@ function PrenajmyZoznam() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={C.primary} />
+        <ActivityIndicator size="large" color={t.primary} />
       </View>
     )
   }
@@ -1074,10 +1089,10 @@ function PrenajmyZoznam() {
   if (chyba) {
     return (
       <View style={[styles.list, { gap: 12 }]}>
-        <View style={[styles.formCard, { borderLeftWidth: 4, borderLeftColor: C.primary }]}>
-          <Text style={[styles.formLabel, { color: C.primary }]}>Nepodarilo sa načítať prenájmy</Text>
-          <Text style={{ fontSize: 13, color: C.textSecondary, lineHeight: 19 }}>{chyba}</Text>
-          <Text style={{ fontSize: 12, color: C.textMuted, marginTop: 8, lineHeight: 18 }}>
+        <View style={[styles.formCard, { borderLeftWidth: 4, borderLeftColor: t.primary }]}>
+          <Text style={[styles.formLabel, { color: t.primary }]}>Nepodarilo sa načítať prenájmy</Text>
+          <Text style={{ fontSize: 13, color: t.textSecondary, lineHeight: 19 }}>{chyba}</Text>
+          <Text style={{ fontSize: 12, color: t.textMuted, marginTop: 8, lineHeight: 18 }}>
             Tip: skontrolujte, či má tabuľka prenajom_haly stĺpec status (text, default &apos;nove&apos;).
           </Text>
           <TouchableOpacity style={[styles.submitBtn, { marginTop: 12 }]} onPress={nacitaj}>
@@ -1142,6 +1157,10 @@ function PrenajomKarta({
   updating: boolean
   onZmenStatus: (id: string, status: string) => void
 }) {
+  const t = useThemeColors()
+  const styles = useMemo(() => makeStyles(t), [t])
+  const prenajomStyles = useMemo(() => makePrenajomStyles(t), [t])
+
   const datumPrenajmu = new Date(z.datum).toLocaleDateString('sk-SK', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   })
@@ -1205,31 +1224,31 @@ function PrenajomKarta({
       <Text style={prenajomStyles.prijate}>Prijaté: {datumPrijatia}</Text>
 
       {updating ? (
-        <ActivityIndicator size="small" color={C.primary} style={{ marginTop: 12 }} />
+        <ActivityIndicator size="small" color={t.primary} style={{ marginTop: 12 }} />
       ) : (
         <View style={styles.akcie}>
           {aktStatus !== 'schvalene' && (
             <TouchableOpacity
-              style={[styles.akciaBtn, { backgroundColor: C.status.success.bg }]}
+              style={[styles.akciaBtn, { backgroundColor: t.status.success.bg }]}
               onPress={() => onZmenStatus(z.id, 'schvalene')}
             >
-              <Text style={[styles.akciaBtnText, { color: C.status.success.fg }]}>Schváliť ✓</Text>
+              <Text style={[styles.akciaBtnText, { color: t.status.success.fg }]}>Schváliť ✓</Text>
             </TouchableOpacity>
           )}
           {aktStatus !== 'zamietnute' && (
             <TouchableOpacity
-              style={[styles.akciaBtn, { backgroundColor: C.status.danger.bg }]}
+              style={[styles.akciaBtn, { backgroundColor: t.status.danger.bg }]}
               onPress={() => onZmenStatus(z.id, 'zamietnute')}
             >
-              <Text style={[styles.akciaBtnText, { color: C.status.danger.fg }]}>Zamietnuť</Text>
+              <Text style={[styles.akciaBtnText, { color: t.status.danger.fg }]}>Zamietnuť</Text>
             </TouchableOpacity>
           )}
           {aktStatus !== 'nove' && (
             <TouchableOpacity
-              style={[styles.akciaBtn, { backgroundColor: C.status.info.bg }]}
+              style={[styles.akciaBtn, { backgroundColor: t.status.info.bg }]}
               onPress={() => onZmenStatus(z.id, 'nove')}
             >
-              <Text style={[styles.akciaBtnText, { color: C.status.info.fg }]}>Označiť ako nové</Text>
+              <Text style={[styles.akciaBtnText, { color: t.status.info.fg }]}>Označiť ako nové</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -1238,7 +1257,7 @@ function PrenajomKarta({
   )
 }
 
-const prenajomStyles = StyleSheet.create({
+const makePrenajomStyles = (t: ThemeColors) => StyleSheet.create({
   detailGrid: {
     gap: 6,
     marginTop: 4,
@@ -1246,33 +1265,36 @@ const prenajomStyles = StyleSheet.create({
   },
   detailRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   detailIcon: { fontSize: 14, width: 18 },
-  detailText: { fontSize: 13, color: C.textSecondary, fontWeight: '500' },
+  detailText: { fontSize: 13, color: t.textSecondary, fontWeight: '500' },
   poznamka: {
     fontSize: 13,
-    color: C.textSecondary,
+    color: t.textSecondary,
     fontStyle: 'italic',
     lineHeight: 19,
-    backgroundColor: C.surfaceAlt,
+    backgroundColor: t.surfaceAlt,
     borderRadius: 8,
     padding: 10,
     marginBottom: 10,
   },
   kontakty: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 8 },
   kontaktBtn: {
-    backgroundColor: C.secondaryLight,
+    backgroundColor: t.secondaryLight,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
-  kontaktBtnEmail: { backgroundColor: C.status.info.bg },
-  kontaktBtnText: { fontSize: 12, fontWeight: '700', color: C.secondary },
-  kontaktBtnEmailText: { color: C.status.info.fg },
+  kontaktBtnEmail: { backgroundColor: t.status.info.bg },
+  kontaktBtnText: { fontSize: 12, fontWeight: '700', color: t.secondary },
+  kontaktBtnEmailText: { color: t.status.info.fg },
   prijate: {
-    fontSize: 11, color: C.textPlaceholder, marginTop: 2,
+    fontSize: 11, color: t.textPlaceholder, marginTop: 2,
   },
 })
 
 function AnketyAdminPanel() {
+  const t = useThemeColors()
+  const styles = useMemo(() => makeStyles(t), [t])
+
   const [podtab, setPodtab] = useState<'nova' | 'zoznam'>('nova')
   const [otazka, setOtazka] = useState('')
   const [popis, setPopis] = useState('')
@@ -1362,7 +1384,7 @@ function AnketyAdminPanel() {
             <TextInput
               style={styles.input}
               placeholder="napr. Súhlasíte s výstavbou novej cyklotrasy?"
-              placeholderTextColor={C.textPlaceholder}
+              placeholderTextColor={t.textPlaceholder}
               value={otazka} onChangeText={setOtazka}
               multiline
             />
@@ -1370,7 +1392,7 @@ function AnketyAdminPanel() {
             <TextInput
               style={[styles.input, { height: 100 }]}
               placeholder="Bližšie informácie pre občanov..."
-              placeholderTextColor={C.textPlaceholder}
+              placeholderTextColor={t.textPlaceholder}
               value={popis} onChangeText={setPopis}
               multiline textAlignVertical="top"
             />
@@ -1378,7 +1400,7 @@ function AnketyAdminPanel() {
             <TextInput
               style={styles.input}
               placeholder="napr. 2026-06-30"
-              placeholderTextColor={C.textPlaceholder}
+              placeholderTextColor={t.textPlaceholder}
               value={deadline} onChangeText={setDeadline}
             />
             <TouchableOpacity
@@ -1386,17 +1408,17 @@ function AnketyAdminPanel() {
               onPress={vytvor} disabled={loading}
             >
               {loading
-                ? <ActivityIndicator color={C.onPrimary} />
+                ? <ActivityIndicator color={t.onPrimary} />
                 : <Text style={styles.submitBtnText}>🗳️ Spustiť anketu</Text>}
             </TouchableOpacity>
-            <Text style={{ fontSize: 12, color: C.textMuted, textAlign: 'center', marginTop: 12 }}>
+            <Text style={{ fontSize: 12, color: t.textMuted, textAlign: 'center', marginTop: 12 }}>
               Občania uvidia anketu v menu „Viac → Ankety obce".
             </Text>
           </View>
         </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-          {nacitavam && <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }} />}
+          {nacitavam && <ActivityIndicator size="large" color={t.primary} style={{ marginTop: 40 }} />}
           {!nacitavam && ankety.length === 0 && (
             <View style={styles.empty}>
               <Text style={styles.emptyEmoji}>🗳️</Text>
@@ -1412,10 +1434,10 @@ function AnketyAdminPanel() {
                 </View>
                 <View style={[
                   styles.statusBadge,
-                  { backgroundColor: a.je_aktivna ? C.status.success.bg : C.status.neutral.bg }
+                  { backgroundColor: a.je_aktivna ? t.status.success.bg : t.status.neutral.bg }
                 ]}>
                   <Text style={[styles.statusText, {
-                    color: a.je_aktivna ? C.status.success.fg : C.status.neutral.fg
+                    color: a.je_aktivna ? t.status.success.fg : t.status.neutral.fg
                   }]}>
                     {a.je_aktivna ? 'Aktívna' : 'Ukončená'}
                   </Text>
@@ -1429,21 +1451,21 @@ function AnketyAdminPanel() {
               <View style={styles.akcie}>
                 <TouchableOpacity
                   style={[styles.akciaBtn, {
-                    backgroundColor: a.je_aktivna ? C.status.warning.bg : C.status.success.bg
+                    backgroundColor: a.je_aktivna ? t.status.warning.bg : t.status.success.bg
                   }]}
                   onPress={() => toggleAktivna(a.id, a.je_aktivna)}
                 >
                   <Text style={[styles.akciaBtnText, {
-                    color: a.je_aktivna ? C.status.warning.fg : C.status.success.fg
+                    color: a.je_aktivna ? t.status.warning.fg : t.status.success.fg
                   }]}>
                     {a.je_aktivna ? '⏸ Ukončiť' : '▶ Aktivovať'}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.akciaBtn, { backgroundColor: C.status.danger.bg }]}
+                  style={[styles.akciaBtn, { backgroundColor: t.status.danger.bg }]}
                   onPress={() => zmaz(a.id)}
                 >
-                  <Text style={[styles.akciaBtnText, { color: C.status.danger.fg }]}>🗑️ Zmazať</Text>
+                  <Text style={[styles.akciaBtnText, { color: t.status.danger.fg }]}>🗑️ Zmazať</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1459,6 +1481,9 @@ function HlasenieKarta({ hlasenie: h, updating, onZmenStatus }: {
   updating: boolean
   onZmenStatus: (id: string, status: string) => void
 }) {
+  const t = useThemeColors()
+  const styles = useMemo(() => makeStyles(t), [t])
+
   const statusInfo = statusInfoFor(h.status)
   const datum = new Date(h.created_at).toLocaleDateString('sk-SK', {
     day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
@@ -1489,7 +1514,7 @@ function HlasenieKarta({ hlasenie: h, updating, onZmenStatus }: {
               <Image
                 key={i}
                 source={{ uri: url }}
-                style={{ width: 88, height: 88, borderRadius: 10, backgroundColor: C.divider }}
+                style={{ width: 88, height: 88, borderRadius: 10, backgroundColor: t.divider }}
                 contentFit="cover"
               />
             ))}
@@ -1497,22 +1522,22 @@ function HlasenieKarta({ hlasenie: h, updating, onZmenStatus }: {
         </ScrollView>
       )}
       {updating ? (
-        <ActivityIndicator size="small" color={C.primary} style={{ marginTop: 12 }} />
+        <ActivityIndicator size="small" color={t.primary} style={{ marginTop: 12 }} />
       ) : (
         <View style={styles.akcie}>
           {h.status !== 'v_rieseni' && (
-            <TouchableOpacity style={[styles.akciaBtn, { backgroundColor: C.status.warning.bg }]} onPress={() => onZmenStatus(h.id, 'v_rieseni')}>
-              <Text style={[styles.akciaBtnText, { color: C.status.warning.fg }]}>V riešení</Text>
+            <TouchableOpacity style={[styles.akciaBtn, { backgroundColor: t.status.warning.bg }]} onPress={() => onZmenStatus(h.id, 'v_rieseni')}>
+              <Text style={[styles.akciaBtnText, { color: t.status.warning.fg }]}>V riešení</Text>
             </TouchableOpacity>
           )}
           {h.status !== 'vyriesene' && (
-            <TouchableOpacity style={[styles.akciaBtn, { backgroundColor: C.status.success.bg }]} onPress={() => onZmenStatus(h.id, 'vyriesene')}>
-              <Text style={[styles.akciaBtnText, { color: C.status.success.fg }]}>Vyriešené ✓</Text>
+            <TouchableOpacity style={[styles.akciaBtn, { backgroundColor: t.status.success.bg }]} onPress={() => onZmenStatus(h.id, 'vyriesene')}>
+              <Text style={[styles.akciaBtnText, { color: t.status.success.fg }]}>Vyriešené ✓</Text>
             </TouchableOpacity>
           )}
           {h.status !== 'zamietnute' && (
-            <TouchableOpacity style={[styles.akciaBtn, { backgroundColor: C.status.danger.bg }]} onPress={() => onZmenStatus(h.id, 'zamietnute')}>
-              <Text style={[styles.akciaBtnText, { color: C.status.danger.fg }]}>Zamietnuť</Text>
+            <TouchableOpacity style={[styles.akciaBtn, { backgroundColor: t.status.danger.bg }]} onPress={() => onZmenStatus(h.id, 'zamietnute')}>
+              <Text style={[styles.akciaBtnText, { color: t.status.danger.fg }]}>Zamietnuť</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -1544,6 +1569,9 @@ function HlasenieKarta({ hlasenie: h, updating, onZmenStatus }: {
 function PublishModeBtn({ emoji, label, sub, active, onPress }: {
   emoji: string; label: string; sub: string; active: boolean; onPress: () => void
 }) {
+  const t = useThemeColors()
+  const publishStyles = useMemo(() => makePublishStyles(t), [t])
+
   return (
     <TouchableOpacity
       style={[publishStyles.modeBtn, active && publishStyles.modeBtnActive]}
@@ -1553,13 +1581,16 @@ function PublishModeBtn({ emoji, label, sub, active, onPress }: {
       accessibilityState={{ selected: active }}
     >
       <Text style={publishStyles.modeEmoji}>{emoji}</Text>
-      <Text style={[publishStyles.modeLabel, active && { color: C.primary }]}>{label}</Text>
-      <Text style={[publishStyles.modeSub, active && { color: C.primary }]} numberOfLines={2}>{sub}</Text>
+      <Text style={[publishStyles.modeLabel, active && { color: t.primary }]}>{label}</Text>
+      <Text style={[publishStyles.modeSub, active && { color: t.primary }]} numberOfLines={2}>{sub}</Text>
     </TouchableOpacity>
   )
 }
 
 function SchedulePreset({ label, onPress }: { label: string; onPress: () => void }) {
+  const t = useThemeColors()
+  const publishStyles = useMemo(() => makePublishStyles(t), [t])
+
   return (
     <TouchableOpacity
       style={publishStyles.preset}
@@ -1571,11 +1602,11 @@ function SchedulePreset({ label, onPress }: { label: string; onPress: () => void
   )
 }
 
-const publishStyles = StyleSheet.create({
+const makePublishStyles = (t: ThemeColors) => StyleSheet.create({
   modeRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   modeBtn: {
     flex: 1,
-    backgroundColor: C.surfaceAlt,
+    backgroundColor: t.surfaceAlt,
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 8,
@@ -1586,37 +1617,40 @@ const publishStyles = StyleSheet.create({
     minHeight: 90,
   },
   modeBtnActive: {
-    backgroundColor: C.primaryLight,
-    borderColor: C.primary,
+    backgroundColor: t.primaryLight,
+    borderColor: t.primary,
   },
   modeEmoji: { fontSize: 24 },
-  modeLabel: { fontSize: 13, fontWeight: '800', color: C.text, letterSpacing: 0.1 },
-  modeSub: { fontSize: 10, color: C.textMuted, textAlign: 'center', fontWeight: '600', lineHeight: 13 },
+  modeLabel: { fontSize: 13, fontWeight: '800', color: t.text, letterSpacing: 0.1 },
+  modeSub: { fontSize: 10, color: t.textMuted, textAlign: 'center', fontWeight: '600', lineHeight: 13 },
 
   scheduleBox: {
-    backgroundColor: C.surfaceAlt,
+    backgroundColor: t.surfaceAlt,
     borderRadius: 12,
     padding: 14,
     marginBottom: 4,
     borderLeftWidth: 4,
-    borderLeftColor: C.primary,
+    borderLeftColor: t.primary,
   },
   scheduleHint: {
-    fontSize: 12, color: C.textSecondary, marginBottom: 12, lineHeight: 17, fontWeight: '600',
+    fontSize: 12, color: t.textSecondary, marginBottom: 12, lineHeight: 17, fontWeight: '600',
   },
   scheduleRow: { flexDirection: 'row', gap: 10 },
 
   preset: {
-    backgroundColor: C.surface,
+    backgroundColor: t.surface,
     borderRadius: 8,
     paddingHorizontal: 10, paddingVertical: 6,
-    borderWidth: 1, borderColor: C.border,
+    borderWidth: 1, borderColor: t.border,
   },
-  presetText: { fontSize: 12, color: C.textSecondary, fontWeight: '700' },
+  presetText: { fontSize: 12, color: t.textSecondary, fontWeight: '700' },
 })
 
 // ─── FARSKÉ OZNAMY — admin podtab ─────────────────────────────────────────
 function FarskeOznamyAdmin() {
+  const t = useThemeColors()
+  const styles = useMemo(() => makeStyles(t), [t])
+
   const [podtab, setPodtab] = useState<'nova' | 'zoznam'>('nova')
   const [typ, setTyp] = useState<'omsa' | 'smutok' | 'krst' | 'sobas' | 'ohlaska' | 'oznam'>('omsa')
   const [nazov, setNazov] = useState('')
@@ -1744,25 +1778,25 @@ function FarskeOznamyAdmin() {
             <Text style={styles.formLabel}>Názov *</Text>
             <TextInput style={styles.input}
               placeholder={typ === 'smutok' ? 'napr. Zomrel Ján Novák' : typ === 'sobas' ? 'napr. Sobáš Peter & Mária' : 'napr. Sobotná sv. omša'}
-              placeholderTextColor={C.textPlaceholder}
+              placeholderTextColor={t.textPlaceholder}
               value={nazov} onChangeText={setNazov} />
 
             <Text style={styles.formLabel}>Dátum (RRRR-MM-DD)</Text>
             <TextInput style={styles.input} placeholder="2026-06-15"
-              placeholderTextColor={C.textPlaceholder} value={datumOd} onChangeText={setDatumOd} />
+              placeholderTextColor={t.textPlaceholder} value={datumOd} onChangeText={setDatumOd} />
 
             <Text style={styles.formLabel}>Čas (HH:MM)</Text>
             <TextInput style={styles.input} placeholder="18:00"
-              placeholderTextColor={C.textPlaceholder} value={cas} onChangeText={setCas} />
+              placeholderTextColor={t.textPlaceholder} value={cas} onChangeText={setCas} />
 
             <Text style={styles.formLabel}>Miesto</Text>
             <TextInput style={styles.input} placeholder="Kostol Výčapy-Opatovce"
-              placeholderTextColor={C.textPlaceholder} value={miesto} onChangeText={setMiesto} />
+              placeholderTextColor={t.textPlaceholder} value={miesto} onChangeText={setMiesto} />
 
             <Text style={styles.formLabel}>Popis / detail</Text>
             <TextInput style={[styles.input, { height: 120 }]}
               placeholder={typ === 'smutok' ? 'Vek, dátum a miesto pohrebu...' : 'Detaily oznamu...'}
-              placeholderTextColor={C.textPlaceholder} value={popis} onChangeText={setPopis}
+              placeholderTextColor={t.textPlaceholder} value={popis} onChangeText={setPopis}
               multiline textAlignVertical="top" />
 
             <TouchableOpacity
@@ -1770,21 +1804,21 @@ function FarskeOznamyAdmin() {
               onPress={vytvor} disabled={loading}
             >
               {loading
-                ? <ActivityIndicator color={C.onPrimary} />
+                ? <ActivityIndicator color={t.onPrimary} />
                 : <Text style={styles.submitBtnText}>⛪ Uverejniť oznam</Text>}
             </TouchableOpacity>
           </View>
         </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-          {nacitavam && <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }} />}
+          {nacitavam && <ActivityIndicator size="large" color={t.primary} style={{ marginTop: 40 }} />}
           {chyba && (
-            <View style={[styles.formCard, { borderLeftWidth: 4, borderLeftColor: C.primary }]}>
-              <Text style={[styles.formLabel, { color: C.primary }]}>Tabuľka neexistuje</Text>
-              <Text style={{ fontSize: 13, color: C.textSecondary, lineHeight: 19 }}>
+            <View style={[styles.formCard, { borderLeftWidth: 4, borderLeftColor: t.primary }]}>
+              <Text style={[styles.formLabel, { color: t.primary }]}>Tabuľka neexistuje</Text>
+              <Text style={{ fontSize: 13, color: t.textSecondary, lineHeight: 19 }}>
                 {chyba}
               </Text>
-              <Text style={{ fontSize: 12, color: C.textMuted, marginTop: 8, lineHeight: 18 }}>
+              <Text style={{ fontSize: 12, color: t.textMuted, marginTop: 8, lineHeight: 18 }}>
                 Tip: spustite SQL skript zo súboru `src/hooks/useFarskeOznamy.ts` v Supabase SQL editore.
               </Text>
             </View>
@@ -1806,10 +1840,10 @@ function FarskeOznamyAdmin() {
                 </View>
                 <View style={[
                   styles.statusBadge,
-                  { backgroundColor: o.je_aktivny ? C.status.success.bg : C.status.neutral.bg }
+                  { backgroundColor: o.je_aktivny ? t.status.success.bg : t.status.neutral.bg }
                 ]}>
                   <Text style={[styles.statusText, {
-                    color: o.je_aktivny ? C.status.success.fg : C.status.neutral.fg
+                    color: o.je_aktivny ? t.status.success.fg : t.status.neutral.fg
                   }]}>
                     {o.je_aktivny ? 'Aktívny' : 'Skrytý'}
                   </Text>
@@ -1824,15 +1858,15 @@ function FarskeOznamyAdmin() {
                 </Text>
               )}
               {o.popis && (
-                <Text style={[styles.kartaDatum, { color: C.textSecondary, marginTop: 6 }]} numberOfLines={3}>
+                <Text style={[styles.kartaDatum, { color: t.textSecondary, marginTop: 6 }]} numberOfLines={3}>
                   {o.popis}
                 </Text>
               )}
               <TouchableOpacity
-                style={[styles.akciaBtn, { backgroundColor: C.status.danger.bg, marginTop: 10, alignSelf: 'flex-start' }]}
+                style={[styles.akciaBtn, { backgroundColor: t.status.danger.bg, marginTop: 10, alignSelf: 'flex-start' }]}
                 onPress={() => zmaz(o.id)}
               >
-                <Text style={[styles.akciaBtnText, { color: C.status.danger.fg }]}>🗑️ Zmazať</Text>
+                <Text style={[styles.akciaBtnText, { color: t.status.danger.fg }]}>🗑️ Zmazať</Text>
               </TouchableOpacity>
             </View>
           ))}
@@ -1850,6 +1884,10 @@ function AdminDashboard({
   hlasenia: Hlasenie[]
   onGoTab: (tab: string) => void
 }) {
+  const t = useThemeColors()
+  const styles = useMemo(() => makeStyles(t), [t])
+  const dashStyles = useMemo(() => makeDashStyles(t), [t])
+
   const [aktualityCount, setAktualityCount] = useState<number | null>(null)
   const [najblizsiVyvoz, setNajblizsiVyvoz] = useState<{ typ: string; datum: string } | null>(null)
   const [posledneOtazky, setPosledneOtazky] = useState<{ obsah: string; created_at: string }[]>([])
@@ -1913,7 +1951,7 @@ function AdminDashboard({
           onPress={() => onGoTab('hlasenia')}
         >
           <Text style={dashStyles.kpiEmoji}>⚠️</Text>
-          <Text style={[dashStyles.kpiNumber, novePodnety > 0 && { color: C.brand.red }]}>
+          <Text style={[dashStyles.kpiNumber, novePodnety > 0 && { color: t.brand.red }]}>
             {aktivnePodnety}
           </Text>
           <Text style={dashStyles.kpiLabel}>aktívnych podnetov</Text>
@@ -1948,7 +1986,7 @@ function AdminDashboard({
           onPress={() => onGoTab('aktuality')}
         >
           <Text style={dashStyles.kpiEmoji}>⚡</Text>
-          <Text style={[dashStyles.kpiNumber, { color: C.primary, fontSize: 18 }]}>+ Nové</Text>
+          <Text style={[dashStyles.kpiNumber, { color: t.primary, fontSize: 18 }]}>+ Nové</Text>
           <Text style={dashStyles.kpiLabel}>publikovať oznam</Text>
         </TouchableOpacity>
       </View>
@@ -2011,7 +2049,7 @@ function AdminDashboard({
   )
 }
 
-const dashStyles = StyleSheet.create({
+const makeDashStyles = (t: ThemeColors) => StyleSheet.create({
   kpiGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -2021,11 +2059,11 @@ const dashStyles = StyleSheet.create({
   kpiCard: {
     flexBasis: '47%',
     flexGrow: 1,
-    backgroundColor: C.surface,
+    backgroundColor: t.surface,
     borderRadius: 14,
     padding: 14,
     minHeight: 110,
-    shadowColor: C.shadow,
+    shadowColor: t.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 6,
@@ -2033,11 +2071,11 @@ const dashStyles = StyleSheet.create({
     position: 'relative',
   },
   kpiEmoji: { fontSize: 22, marginBottom: 4 },
-  kpiNumber: { fontSize: 26, fontWeight: '900', color: C.text, letterSpacing: -0.5 },
-  kpiLabel: { fontSize: 11, color: C.textMuted, marginTop: 2, fontWeight: '600' },
+  kpiNumber: { fontSize: 26, fontWeight: '900', color: t.text, letterSpacing: -0.5 },
+  kpiLabel: { fontSize: 11, color: t.textMuted, marginTop: 2, fontWeight: '600' },
   kpiBadge: {
     position: 'absolute', top: 10, right: 10,
-    backgroundColor: C.brand.red,
+    backgroundColor: t.brand.red,
     paddingHorizontal: 7, paddingVertical: 3,
     borderRadius: 8,
   },
@@ -2045,18 +2083,18 @@ const dashStyles = StyleSheet.create({
 
   section: { marginTop: 16, gap: 8 },
   sectionLabel: {
-    fontSize: 11, fontWeight: '800', color: C.textMuted,
+    fontSize: 11, fontWeight: '800', color: t.textMuted,
     letterSpacing: 0.8, marginBottom: 6,
   },
 
   qBox: {
     flexDirection: 'row',
-    backgroundColor: C.surface,
+    backgroundColor: t.surface,
     borderRadius: 12,
     padding: 12,
     gap: 10,
     alignItems: 'flex-start',
-    shadowColor: C.shadow,
+    shadowColor: t.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
     shadowRadius: 3,
@@ -2064,41 +2102,41 @@ const dashStyles = StyleSheet.create({
     marginBottom: 6,
   },
   qEmoji: { fontSize: 18 },
-  qText: { fontSize: 13, color: C.text, lineHeight: 18, fontWeight: '500' },
-  qDate: { fontSize: 11, color: C.textPlaceholder, marginTop: 4 },
+  qText: { fontSize: 13, color: t.text, lineHeight: 18, fontWeight: '500' },
+  qDate: { fontSize: 11, color: t.textPlaceholder, marginTop: 4 },
 
   emptyMini: {
-    backgroundColor: C.surfaceAlt,
+    backgroundColor: t.surfaceAlt,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
   },
-  emptyMiniText: { fontSize: 12, color: C.textMuted, textAlign: 'center' },
+  emptyMiniText: { fontSize: 12, color: t.textMuted, textAlign: 'center' },
 
   quickRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: C.surface,
+    backgroundColor: t.surface,
     borderRadius: 12,
     padding: 14,
     gap: 12,
     marginBottom: 6,
-    shadowColor: C.shadow,
+    shadowColor: t.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
     shadowRadius: 3,
     elevation: 1,
   },
   quickEmoji: { fontSize: 24 },
-  quickTitle: { fontSize: 14, fontWeight: '700', color: C.text },
-  quickSub: { fontSize: 11, color: C.textMuted, marginTop: 1 },
-  quickChevron: { fontSize: 24, color: C.textPlaceholder, fontWeight: '300' },
+  quickTitle: { fontSize: 14, fontWeight: '700', color: t.text },
+  quickSub: { fontSize: 11, color: t.textMuted, marginTop: 1 },
+  quickChevron: { fontSize: 24, color: t.textPlaceholder, fontWeight: '300' },
 })
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.background },
+const makeStyles = (t: ThemeColors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: t.background },
   header: {
-    backgroundColor: C.primary,
+    backgroundColor: t.primary,
     paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20,
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
@@ -2108,101 +2146,101 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.15)',
     justifyContent: 'center', alignItems: 'center',
   },
-  headerTitle: { color: C.onPrimary, fontSize: 18, fontWeight: '700' },
+  headerTitle: { color: t.onPrimary, fontSize: 18, fontWeight: '700' },
   headerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 1 },
   logoutBtn: {
     backgroundColor: 'rgba(255,255,255,0.18)',
     borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6,
   },
-  logoutText: { color: C.onPrimary, fontSize: 13, fontWeight: '700' },
+  logoutText: { color: t.onPrimary, fontSize: 13, fontWeight: '700' },
   taby: {
-    backgroundColor: C.surface,
-    borderBottomWidth: 1, borderBottomColor: C.borderLight,
+    backgroundColor: t.surface,
+    borderBottomWidth: 1, borderBottomColor: t.borderLight,
     maxHeight: 50,
   },
   tab: { paddingVertical: 14, paddingHorizontal: 16, alignItems: 'center' },
-  tabActive: { borderBottomWidth: 3, borderBottomColor: C.primary },
-  tabText: { fontSize: 11, fontWeight: '600', color: C.textMuted },
-  tabTextActive: { color: C.primary, fontWeight: '700' },
+  tabActive: { borderBottomWidth: 3, borderBottomColor: t.primary },
+  tabText: { fontSize: 11, fontWeight: '600', color: t.textMuted },
+  tabTextActive: { color: t.primary, fontWeight: '700' },
   podtaby: {
-    flexDirection: 'row', backgroundColor: C.background,
-    borderBottomWidth: 1, borderBottomColor: C.borderLight,
+    flexDirection: 'row', backgroundColor: t.background,
+    borderBottomWidth: 1, borderBottomColor: t.borderLight,
   },
   podtab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
-  podtabActive: { borderBottomWidth: 2, borderBottomColor: C.primary },
-  podtabText: { fontSize: 13, fontWeight: '600', color: C.textMuted },
-  podtabTextActive: { color: C.primary, fontWeight: '700' },
+  podtabActive: { borderBottomWidth: 2, borderBottomColor: t.primary },
+  podtabText: { fontSize: 13, fontWeight: '600', color: t.textMuted },
+  podtabTextActive: { color: t.primary, fontWeight: '700' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   list: { padding: 16, gap: 10 },
-  sekcia: { fontSize: 13, fontWeight: '700', color: C.textSecondary, marginBottom: 4, marginTop: 4 },
+  sekcia: { fontSize: 13, fontWeight: '700', color: t.textSecondary, marginBottom: 4, marginTop: 4 },
   formCard: {
-    backgroundColor: C.surface, borderRadius: 14, padding: 16,
-    shadowColor: C.shadow, shadowOffset: { width: 0, height: 2 },
+    backgroundColor: t.surface, borderRadius: 14, padding: 16,
+    shadowColor: t.shadow, shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
   },
-  formLabel: { fontSize: 13, fontWeight: '700', color: C.textSecondary, marginBottom: 8 },
+  formLabel: { fontSize: 13, fontWeight: '700', color: t.textSecondary, marginBottom: 8 },
   input: {
-    borderWidth: 1.5, borderColor: C.border, borderRadius: 10,
-    padding: 12, fontSize: 15, color: C.text, marginBottom: 16,
-    backgroundColor: C.surface,
+    borderWidth: 1.5, borderColor: t.border, borderRadius: 10,
+    padding: 12, fontSize: 15, color: t.text, marginBottom: 16,
+    backgroundColor: t.surface,
   },
   katBtn: {
     borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8,
-    backgroundColor: C.surfaceAlt, borderWidth: 1.5, borderColor: C.border,
+    backgroundColor: t.surfaceAlt, borderWidth: 1.5, borderColor: t.border,
   },
-  katBtnActive: { backgroundColor: C.primaryLight, borderColor: C.primary },
-  katBtnText: { fontSize: 13, fontWeight: '600', color: C.textSecondary },
-  katBtnTextActive: { color: C.primary, fontWeight: '700' },
+  katBtnActive: { backgroundColor: t.primaryLight, borderColor: t.primary },
+  katBtnText: { fontSize: 13, fontWeight: '600', color: t.textSecondary },
+  katBtnTextActive: { color: t.primary, fontWeight: '700' },
   publikovatRow: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', marginBottom: 16,
   },
   toggle: {
     width: 48, height: 28, borderRadius: 14,
-    backgroundColor: C.border, justifyContent: 'center', padding: 2,
+    backgroundColor: t.border, justifyContent: 'center', padding: 2,
   },
-  toggleActive: { backgroundColor: C.secondary },
-  toggleKnob: { width: 24, height: 24, borderRadius: 12, backgroundColor: C.surface },
+  toggleActive: { backgroundColor: t.secondary },
+  toggleKnob: { width: 24, height: 24, borderRadius: 12, backgroundColor: t.surface },
   toggleKnobActive: { alignSelf: 'flex-end' },
   submitBtn: {
-    backgroundColor: C.primary, borderRadius: 12,
+    backgroundColor: t.primary, borderRadius: 12,
     padding: 16, alignItems: 'center',
   },
-  submitBtnText: { color: C.onPrimary, fontSize: 15, fontWeight: '700' },
+  submitBtnText: { color: t.onPrimary, fontSize: 15, fontWeight: '700' },
   karta: {
-    backgroundColor: C.surface, borderRadius: 14, padding: 16,
-    shadowColor: C.shadow, shadowOffset: { width: 0, height: 2 },
+    backgroundColor: t.surface, borderRadius: 14, padding: 16,
+    shadowColor: t.shadow, shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
   },
   kartaHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   kartaEmoji: { fontSize: 28 },
   kartaInfo: { flex: 1 },
-  kartaKategoria: { fontSize: 12, fontWeight: '800', color: C.text, letterSpacing: 0.5 },
-  kartaDatum: { fontSize: 11, color: C.textPlaceholder, marginTop: 2 },
+  kartaKategoria: { fontSize: 12, fontWeight: '800', color: t.text, letterSpacing: 0.5 },
+  kartaDatum: { fontSize: 11, color: t.textPlaceholder, marginTop: 2 },
   statusBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
   statusText: { fontSize: 11, fontWeight: '700' },
-  kartaPopis: { fontSize: 14, color: C.textSecondary, lineHeight: 20, marginBottom: 6 },
-  kartaAdresa: { fontSize: 12, color: C.textMuted, marginBottom: 4 },
+  kartaPopis: { fontSize: 14, color: t.textSecondary, lineHeight: 20, marginBottom: 6 },
+  kartaAdresa: { fontSize: 12, color: t.textMuted, marginBottom: 4 },
   akcie: { flexDirection: 'row', gap: 8, marginTop: 10, flexWrap: 'wrap' },
   akciaBtn: { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
   akciaBtnText: { fontSize: 12, fontWeight: '700' },
   empty: { alignItems: 'center', paddingTop: 60, gap: 12 },
   emptyEmoji: { fontSize: 48 },
-  emptyText: { fontSize: 16, color: C.textMuted, fontWeight: '600' },
+  emptyText: { fontSize: 16, color: t.textMuted, fontWeight: '600' },
   historiaContainer: {
     marginTop: 12, borderTopWidth: 1,
-    borderTopColor: C.divider, paddingTop: 10, gap: 6,
+    borderTopColor: t.divider, paddingTop: 10, gap: 6,
   },
-  historiaTitle: { fontSize: 10, fontWeight: '800', color: C.textPlaceholder, letterSpacing: 1, marginBottom: 4 },
+  historiaTitle: { fontSize: 10, fontWeight: '800', color: t.textPlaceholder, letterSpacing: 1, marginBottom: 4 },
   historiaZaznam: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  historiaText: { fontSize: 12, color: C.textSecondary },
-  historiaDatum: { fontSize: 11, color: C.textPlaceholder },
+  historiaText: { fontSize: 12, color: t.textSecondary },
+  historiaDatum: { fontSize: 11, color: t.textPlaceholder },
 
   // Cover picker pre nová aktualita
   coverPickerBtn: {
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: C.border,
+    borderColor: t.border,
     borderStyle: 'dashed',
     overflow: 'hidden',
     marginBottom: 16,
@@ -2212,7 +2250,7 @@ const styles = StyleSheet.create({
     height: 140,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: C.surfaceAlt,
+    backgroundColor: t.surfaceAlt,
   },
   coverRemove: {
     position: 'absolute',

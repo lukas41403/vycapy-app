@@ -11,25 +11,38 @@
  * Dáta: Open-Meteo (žiadny API kľúč).
  */
 
-import { Card } from '@/components/ui'
+import { Card, Icon, IconName, PressableScale } from '@/components/ui'
 import { useTenant } from '@/src/config/tenant'
 import { useWeather } from '@/src/hooks/useWeather'
 import { useThemeColors } from '@/src/theme/ThemeContext'
-import { radius, spacing, typo } from '@/src/theme/tokens'
+import { fonts, radius, spacing, typo } from '@/src/theme/tokens'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import {
   ActivityIndicator,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 const POCASIE_MODRA = '#0277BD'
+
+type MciName = React.ComponentProps<typeof MaterialCommunityIcons>['name']
+function weatherGlyph(code: number, isDay = true): MciName {
+  if (code === 0 || code === 1) return isDay ? 'weather-sunny' : 'weather-night'
+  if (code === 2) return isDay ? 'weather-partly-cloudy' : 'weather-night-partly-cloudy'
+  if (code === 3) return 'weather-cloudy'
+  if (code === 45 || code === 48) return 'weather-fog'
+  if (code >= 51 && code <= 55) return 'weather-partly-rainy'
+  if ((code >= 61 && code <= 65) || code === 80 || code === 81) return 'weather-rainy'
+  if (code === 82) return 'weather-pouring'
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return 'weather-snowy'
+  if (code >= 95) return 'weather-lightning-rainy'
+  return 'weather-cloudy'
+}
 
 function formatCas(iso: string): string {
   const d = new Date(iso)
@@ -59,15 +72,16 @@ export default function PocasieScreen() {
   const { data, loading, error, refresh } = useWeather(tenant.mapaCentrum.lat, tenant.mapaCentrum.lng)
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: t.background }]}>
-      <StatusBar barStyle="light-content" backgroundColor={POCASIE_MODRA} />
-
+    <SafeAreaView style={[styles.safe, { backgroundColor: t.background }]} edges={['top']}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: POCASIE_MODRA }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.back} hitSlop={10}>
-          <Text style={styles.backText}>← Späť</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>☁️ Počasie</Text>
+        <PressableScale onPress={() => router.back()} style={styles.back} scaleTo={0.94} accessibilityLabel="Späť">
+          <Icon name="chevronBack" size={20} color="#FFFFFF" /><Text style={styles.backText}>Späť</Text>
+        </PressableScale>
+        <View style={styles.headerTitleRow}>
+          <Icon name="pocasie" size={22} color="#FFFFFF" />
+          <Text style={styles.headerTitle}>Počasie</Text>
+        </View>
         <Text style={styles.headerSub}>{tenant.nazov} · zdroj: Open-Meteo</Text>
       </View>
 
@@ -92,14 +106,14 @@ export default function PocasieScreen() {
 
         {error && !data && (
           <Card>
-            <Text style={[typo.h3, { color: t.text, marginBottom: 4 }]}>⚠️ Nepodarilo sa načítať</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <Icon name="info" size={18} color={t.text} />
+              <Text style={[typo.h3, { color: t.text }]}>Nepodarilo sa načítať</Text>
+            </View>
             <Text style={[typo.caption, { color: t.textMuted }]}>{error}</Text>
-            <TouchableOpacity
-              onPress={refresh}
-              style={[styles.retryBtn, { backgroundColor: POCASIE_MODRA, marginTop: spacing.sm }]}
-            >
+            <PressableScale onPress={refresh} style={[styles.retryBtn, { backgroundColor: POCASIE_MODRA, marginTop: spacing.sm }]} scaleTo={0.96}>
               <Text style={styles.retryBtnText}>Skúsiť znova</Text>
-            </TouchableOpacity>
+            </PressableScale>
           </Card>
         )}
 
@@ -107,7 +121,7 @@ export default function PocasieScreen() {
           <>
             {/* Hero — aktuálne */}
             <View style={[styles.hero, { backgroundColor: t.surface }]}>
-              <Text style={styles.heroEmoji}>{data.emoji}</Text>
+              <MaterialCommunityIcons name={weatherGlyph(data.kod, data.jeDen)} size={92} color={POCASIE_MODRA} />
               <Text style={[styles.heroTeplota, { color: t.text }]}>{data.teplota}°</Text>
               <Text style={[styles.heroPopis, { color: t.textSecondary }]}>{data.popis}</Text>
               <Text style={[styles.heroPocit, { color: t.textMuted }]}>
@@ -117,12 +131,12 @@ export default function PocasieScreen() {
 
             {/* Doplnkové info */}
             <View style={styles.detailRow}>
-              <DetailBox emoji="💨" label="Vietor" value={`${data.vietor} km/h`} sub={smerVietra(data.smerVietra)} />
-              <DetailBox emoji="💧" label="Vlhkosť" value={`${data.vlhkost}%`} />
+              <DetailBox icon="wind" label="Vietor" value={`${data.vietor} km/h`} sub={smerVietra(data.smerVietra)} />
+              <DetailBox icon="humidity" label="Vlhkosť" value={`${data.vlhkost}%`} />
               {data.daily[0] && (
                 <>
-                  <DetailBox emoji="🌅" label="Východ" value={formatCas(data.daily[0].vychod)} />
-                  <DetailBox emoji="🌇" label="Západ" value={formatCas(data.daily[0].zapad)} />
+                  <DetailBox icon="sun" label="Východ" value={formatCas(data.daily[0].vychod)} />
+                  <DetailBox icon="moon" label="Západ" value={formatCas(data.daily[0].zapad)} />
                 </>
               )}
             </View>
@@ -190,7 +204,7 @@ export default function PocasieScreen() {
                       <Text style={[styles.hourCas, { color: t.textMuted }]}>
                         {i === 0 ? 'Teraz' : cas}
                       </Text>
-                      <Text style={styles.hourEmoji}>{h.emoji}</Text>
+                      <MaterialCommunityIcons name={weatherGlyph(h.kod)} size={26} color={POCASIE_MODRA} />
                       <Text style={[styles.hourTeplota, { color: t.text }]}>{h.teplota}°</Text>
                       {h.pravdepodobnostZrazok > 5 && (
                         <Text style={[styles.hourRain, { color: '#0288D1' }]}>
@@ -221,15 +235,16 @@ export default function PocasieScreen() {
                         <Text style={[styles.dayHlavny, { color: t.text }]}>{hlavny}</Text>
                         <Text style={[styles.daySub, { color: t.textMuted }]}>{sub}</Text>
                       </View>
-                      <Text style={styles.dayEmoji}>{d.emoji}</Text>
+                      <View style={styles.dayEmoji}><MaterialCommunityIcons name={weatherGlyph(d.kod)} size={26} color={POCASIE_MODRA} /></View>
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.dayPopis, { color: t.textSecondary }]} numberOfLines={1}>
                           {d.popis}
                         </Text>
                         {d.pravdepodobnostZrazok > 5 && (
-                          <Text style={[styles.dayRain, { color: '#0288D1' }]}>
-                            💧 {d.pravdepodobnostZrazok}% · {d.zrazky.toFixed(1)} mm
-                          </Text>
+                          <View style={styles.dayRainRow}>
+                            <Icon name="rain" size={12} color="#0288D1" />
+                            <Text style={[styles.dayRain, { color: '#0288D1' }]}>{d.pravdepodobnostZrazok}% · {d.zrazky.toFixed(1)} mm</Text>
+                          </View>
                         )}
                       </View>
                       <View style={styles.dayTemp}>
@@ -254,13 +269,13 @@ export default function PocasieScreen() {
   )
 }
 
-function DetailBox({ emoji, label, value, sub }: {
-  emoji: string; label: string; value: string; sub?: string
+function DetailBox({ icon, label, value, sub }: {
+  icon: IconName; label: string; value: string; sub?: string
 }) {
   const t = useThemeColors()
   return (
     <View style={[styles.detailBox, { backgroundColor: t.surface }]}>
-      <Text style={styles.detailEmoji}>{emoji}</Text>
+      <Icon name={icon} size={20} color={POCASIE_MODRA} />
       <Text style={[styles.detailValue, { color: t.text }]}>{value}</Text>
       <Text style={[styles.detailLabel, { color: t.textMuted }]}>{label}</Text>
       {sub && <Text style={[styles.detailSub, { color: t.textPlaceholder }]}>{sub}</Text>}
@@ -276,10 +291,11 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
     gap: 4,
   },
-  back: { alignSelf: 'flex-start' },
-  backText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700', marginBottom: 6 },
+  back: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', marginBottom: 6 },
+  backText: { color: '#FFFFFF', ...typo.bodyB },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   headerTitle: { color: '#FFFFFF', ...typo.h1 },
-  headerSub: { color: 'rgba(255,255,255,0.9)', ...typo.caption, fontWeight: '600' },
+  headerSub: { color: 'rgba(255,255,255,0.9)', ...typo.caption, fontFamily: 'Inter_600SemiBold', marginTop: 2 },
 
   loadingBox: { padding: 60, alignItems: 'center', gap: 12 },
   loadingText: { ...typo.caption, fontWeight: '600' },
@@ -377,9 +393,10 @@ const styles = StyleSheet.create({
   },
   dayHlavny: { fontSize: 14, fontWeight: '800' },
   daySub: { fontSize: 11, fontWeight: '600', marginTop: 1 },
-  dayEmoji: { fontSize: 28, width: 36, textAlign: 'center' },
+  dayEmoji: { width: 36, alignItems: 'center' },
   dayPopis: { ...typo.caption },
-  dayRain: { fontSize: 11, fontWeight: '700', marginTop: 2 },
+  dayRainRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  dayRain: { fontSize: 11, fontWeight: '700' },
   dayTemp: { flexDirection: 'row', alignItems: 'baseline', gap: 6, minWidth: 70, justifyContent: 'flex-end' },
   dayMax: { fontSize: 16, fontWeight: '900' },
   dayMin: { fontSize: 13, fontWeight: '700' },

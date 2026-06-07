@@ -8,23 +8,26 @@
  * povedať pri telefonáte.
  */
 
-import { Badge, Button, Card, SectionHeader } from '@/components/ui'
-import { Ordinant, Sluzba, SluzbaAkcia, useTenant } from '@/src/config/tenant'
+import { AtmosphereBackground, Badge, Button, Card, Icon, IconName, PressableScale, SectionHeader } from '@/components/ui'
+import { Ordinant, SluzbaAkcia, useTenant } from '@/src/config/tenant'
 import { useThemeColors } from '@/src/theme/ThemeContext'
-import { radius, shadows, spacing, typo } from '@/src/theme/tokens'
+import { fonts, radius, shadows, spacing, typo } from '@/src/theme/tokens'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useMemo } from 'react'
 import {
   Alert,
   Linking,
-  SafeAreaView,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+
+const SLUZBA_ICON: Record<string, IconName> = {
+  zdravotnictvo: 'sluzby', lekaren: 'sluzby', farsky: 'farske', veterina: 'leaf', posta: 'document', iny: 'sluzby',
+}
+const sluzbaIcon = (kat: string): IconName => SLUZBA_ICON[kat] ?? 'sluzby'
 
 const DEN_LABEL: Record<string, string> = {
   pondelok: 'Pondelok', utorok: 'Utorok', streda: 'Streda',
@@ -55,9 +58,9 @@ export default function SluzbaDetailScreen() {
 
   if (!sluzba) {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: t.background }]}>
+      <SafeAreaView style={[styles.safe, { backgroundColor: t.background }]} edges={['top']}>
         <View style={styles.notFoundBox}>
-          <Text style={styles.notFoundEmoji}>❓</Text>
+          <Icon name="search" size={48} color={t.textMuted} />
           <Text style={[styles.notFoundTitle, { color: t.text }]}>Služba neexistuje</Text>
           <Button title="Späť" onPress={() => router.back()} variant="outline" />
         </View>
@@ -101,16 +104,16 @@ export default function SluzbaDetailScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: t.background }]}>
-      <StatusBar barStyle="light-content" backgroundColor={t.primary} />
-
+    <SafeAreaView style={[styles.safe, { backgroundColor: t.background }]} edges={['top']}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: t.primary }]}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
-          <Text style={styles.backText}>← Späť</Text>
-        </TouchableOpacity>
+        <PressableScale onPress={() => router.back()} style={styles.backBtn} scaleTo={0.94} accessibilityLabel="Späť">
+          <Icon name="chevronBack" size={20} color="#FFFFFF" /><Text style={styles.backText}>Späť</Text>
+        </PressableScale>
         <View style={styles.headerRow}>
-          <Text style={styles.headerEmoji}>{sluzba.emoji}</Text>
+          <View style={styles.headerIconBox}>
+            <Icon name={sluzbaIcon(sluzba.kategoria)} size={28} color="#FFFFFF" />
+          </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>{sluzba.nazov}</Text>
             {sluzba.podtitul && <Text style={styles.headerSub}>{sluzba.podtitul}</Text>}
@@ -132,68 +135,39 @@ export default function SluzbaDetailScreen() {
             )}
             {sluzba.adresa && (
               <View style={styles.kontaktRow}>
-                <Text style={styles.kontaktIcon}>📍</Text>
+                <Icon name="location" size={18} color={t.textMuted} />
                 <Text style={[styles.kontaktText, { color: t.text }]}>{sluzba.adresa}</Text>
               </View>
             )}
             {sluzba.telefon && (
-              <TouchableOpacity
-                style={styles.kontaktRow}
-                onPress={() => zavolatTel(sluzba.telefon!)}
-                accessibilityRole="button"
-                accessibilityLabel={`Zavolať pevná linka ${formatTel(sluzba.telefon)}`}
-              >
-                <Text style={styles.kontaktIcon}>📞</Text>
-                <Text style={[styles.kontaktText, styles.kontaktLink, { color: t.primary }]}>
-                  {formatTel(sluzba.telefon)}
-                </Text>
-              </TouchableOpacity>
+              <PressableScale style={styles.kontaktRow} scaleTo={0.98} onPress={() => zavolatTel(sluzba.telefon!)} accessibilityLabel={`Zavolať ${formatTel(sluzba.telefon)}`}>
+                <Icon name="kontakty" size={18} color={t.primary} />
+                <Text style={[styles.kontaktText, styles.kontaktLink, { color: t.primary }]}>{formatTel(sluzba.telefon)}</Text>
+              </PressableScale>
             )}
             {sluzba.mobil && (
-              <TouchableOpacity
-                style={styles.kontaktRow}
-                onPress={() => zavolatTel(sluzba.mobil!)}
-                accessibilityRole="button"
-                accessibilityLabel={`Zavolať mobil ${formatTel(sluzba.mobil)}`}
-              >
-                <Text style={styles.kontaktIcon}>📱</Text>
-                <Text style={[styles.kontaktText, styles.kontaktLink, { color: t.primary }]}>
-                  {formatTel(sluzba.mobil)}
-                </Text>
-              </TouchableOpacity>
+              <PressableScale style={styles.kontaktRow} scaleTo={0.98} onPress={() => zavolatTel(sluzba.mobil!)} accessibilityLabel={`Zavolať mobil ${formatTel(sluzba.mobil)}`}>
+                <Icon name="phonePortrait" size={18} color={t.primary} />
+                <Text style={[styles.kontaktText, styles.kontaktLink, { color: t.primary }]}>{formatTel(sluzba.mobil)}</Text>
+              </PressableScale>
             )}
             {sluzba.email && (
-              <TouchableOpacity
-                style={styles.kontaktRow}
-                onPress={() => Linking.openURL(`mailto:${sluzba.email}`)}
-              >
-                <Text style={styles.kontaktIcon}>✉️</Text>
-                <Text style={[styles.kontaktText, styles.kontaktLink, { color: t.primary }]}>
-                  {sluzba.email}
-                </Text>
-              </TouchableOpacity>
+              <PressableScale style={styles.kontaktRow} scaleTo={0.98} onPress={() => Linking.openURL(`mailto:${sluzba.email}`)} accessibilityLabel="E-mail">
+                <Icon name="mail" size={18} color={t.primary} />
+                <Text style={[styles.kontaktText, styles.kontaktLink, { color: t.primary }]}>{sluzba.email}</Text>
+              </PressableScale>
             )}
             {sluzba.web && (
-              <TouchableOpacity
-                style={styles.kontaktRow}
-                onPress={() => Linking.openURL(sluzba.web!)}
-              >
-                <Text style={styles.kontaktIcon}>🌐</Text>
-                <Text style={[styles.kontaktText, styles.kontaktLink, { color: t.primary }]} numberOfLines={1}>
-                  {sluzba.web.replace(/^https?:\/\//, '')}
-                </Text>
-              </TouchableOpacity>
+              <PressableScale style={styles.kontaktRow} scaleTo={0.98} onPress={() => Linking.openURL(sluzba.web!)} accessibilityLabel="Web">
+                <Icon name="globe" size={18} color={t.primary} />
+                <Text style={[styles.kontaktText, styles.kontaktLink, { color: t.primary }]} numberOfLines={1}>{sluzba.web.replace(/^https?:\/\//, '')}</Text>
+              </PressableScale>
             )}
             {sluzba.facebook && (
-              <TouchableOpacity
-                style={styles.kontaktRow}
-                onPress={() => Linking.openURL(sluzba.facebook!)}
-              >
-                <Text style={styles.kontaktIcon}>📘</Text>
-                <Text style={[styles.kontaktText, styles.kontaktLink, { color: t.primary }]}>
-                  Facebook stránka
-                </Text>
-              </TouchableOpacity>
+              <PressableScale style={styles.kontaktRow} scaleTo={0.98} onPress={() => Linking.openURL(sluzba.facebook!)} accessibilityLabel="Facebook">
+                <Icon name="globe" size={18} color={t.primary} />
+                <Text style={[styles.kontaktText, styles.kontaktLink, { color: t.primary }]}>Facebook stránka</Text>
+              </PressableScale>
             )}
           </Card>
         )}
@@ -203,27 +177,29 @@ export default function SluzbaDetailScreen() {
           <View style={{ marginBottom: spacing.lg }}>
             <SectionHeader title="Rýchle akcie" />
             <View style={{ gap: spacing.sm }}>
-              {sluzba.akcie.map(a => (
-                <TouchableOpacity
-                  key={a.id}
-                  style={[styles.akciaCard, { backgroundColor: t.surface, shadowColor: t.shadow }]}
-                  activeOpacity={0.85}
-                  onPress={() => vykonajAkciu(a)}
-                  accessibilityRole="button"
-                  accessibilityLabel={a.label}
-                >
-                  <Text style={styles.akciaIcon}>{a.icon}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.akciaLabel, { color: t.text }]}>{a.label}</Text>
-                    {a.popis && (
-                      <Text style={[styles.akciaPopis, { color: t.textMuted }]} numberOfLines={2}>
-                        {a.popis}
-                      </Text>
-                    )}
-                  </View>
-                  <Text style={[styles.chevron, { color: t.primary }]}>›</Text>
-                </TouchableOpacity>
-              ))}
+              {sluzba.akcie.map(a => {
+                const aIcon: IconName = a.typ === 'tel' ? 'kontakty' : a.typ === 'mail' ? 'mail' : a.typ === 'web' ? 'globe' : 'flash'
+                return (
+                  <PressableScale
+                    key={a.id}
+                    style={[styles.akciaCard, { backgroundColor: t.surface, shadowColor: t.shadow }]}
+                    scaleTo={0.98}
+                    onPress={() => vykonajAkciu(a)}
+                    accessibilityLabel={a.label}
+                  >
+                    <View style={[styles.akciaIconBox, { backgroundColor: t.primaryLight }]}>
+                      <Icon name={aIcon} size={20} color={t.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.akciaLabel, { color: t.text }]}>{a.label}</Text>
+                      {a.popis && (
+                        <Text style={[styles.akciaPopis, { color: t.textMuted }]} numberOfLines={2}>{a.popis}</Text>
+                      )}
+                    </View>
+                    <Icon name="chevron" size={20} color={t.textPlaceholder} />
+                  </PressableScale>
+                )
+              })}
             </View>
           </View>
         )}
@@ -290,9 +266,8 @@ export default function SluzbaDetailScreen() {
         {/* Poznámka */}
         {sluzba.poznamka && (
           <View style={[styles.poznamkaBox, { backgroundColor: t.surfaceAlt, borderLeftColor: t.primary }]}>
-            <Text style={[styles.poznamkaText, { color: t.textSecondary }]}>
-              ℹ️ {sluzba.poznamka}
-            </Text>
+            <Icon name="info" size={16} color={t.primary} />
+            <Text style={[styles.poznamkaText, { color: t.textSecondary }]}>{sluzba.poznamka}</Text>
           </View>
         )}
 
@@ -349,20 +324,14 @@ function LekarKarta({
       {/* Kontakty + zavolať */}
       <View style={[styles.lekarContacts, { borderTopColor: t.borderLight }]}>
         {lekar.telefon && (
-          <TouchableOpacity
-            style={[styles.lekarBtn, { backgroundColor: t.primary }]}
-            onPress={() => onCall(lekar.telefon!)}
-          >
-            <Text style={styles.lekarBtnText}>📞 {formatTel(lekar.telefon)}</Text>
-          </TouchableOpacity>
+          <PressableScale style={[styles.lekarBtn, { backgroundColor: t.primary }]} scaleTo={0.96} onPress={() => onCall(lekar.telefon!)} accessibilityLabel={`Zavolať ${formatTel(lekar.telefon)}`}>
+            <Icon name="kontakty" size={14} color="#FFFFFF" /><Text style={styles.lekarBtnText}>{formatTel(lekar.telefon)}</Text>
+          </PressableScale>
         )}
         {lekar.mobil && (
-          <TouchableOpacity
-            style={[styles.lekarBtn, { backgroundColor: t.secondary }]}
-            onPress={() => onCall(lekar.mobil!)}
-          >
-            <Text style={styles.lekarBtnText}>📱 {formatTel(lekar.mobil)}</Text>
-          </TouchableOpacity>
+          <PressableScale style={[styles.lekarBtn, { backgroundColor: t.secondary }]} scaleTo={0.96} onPress={() => onCall(lekar.mobil!)} accessibilityLabel={`Zavolať mobil ${formatTel(lekar.mobil)}`}>
+            <Icon name="phonePortrait" size={14} color="#FFFFFF" /><Text style={styles.lekarBtnText}>{formatTel(lekar.mobil)}</Text>
+          </PressableScale>
         )}
       </View>
 
@@ -416,10 +385,10 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: spacing.lg,
   },
-  backBtn: { alignSelf: 'flex-start', paddingVertical: 6, marginBottom: 8 },
-  backText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', paddingVertical: 6, marginBottom: 8 },
+  backText: { color: '#FFFFFF', ...typo.bodyB },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  headerEmoji: { fontSize: 42 },
+  headerIconBox: { width: 56, height: 56, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
   headerTitle: { color: '#FFFFFF', ...typo.h1 },
   headerSub: { color: 'rgba(255,255,255,0.9)', ...typo.caption, fontWeight: '600', marginTop: 2 },
 
@@ -446,7 +415,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     ...shadows.sm,
   },
-  akciaIcon: { fontSize: 28 },
+  akciaIconBox: { width: 44, height: 44, borderRadius: radius.md, justifyContent: 'center', alignItems: 'center' },
   akciaLabel: { ...typo.h3 },
   akciaPopis: { ...typo.caption, marginTop: 2 },
 
@@ -487,11 +456,12 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   lekarBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: spacing.md,
     paddingVertical: 10,
     borderRadius: radius.sm,
   },
-  lekarBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  lekarBtnText: { color: '#FFFFFF', ...typo.captionB },
 
   lekarRozvrh: {
     paddingHorizontal: spacing.lg,
@@ -516,15 +486,13 @@ const styles = StyleSheet.create({
 
   // Poznámka
   poznamkaBox: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm,
     borderRadius: radius.md,
     borderLeftWidth: 4,
     padding: spacing.md,
   },
-  poznamkaText: { ...typo.caption, lineHeight: 19 },
-
-  chevron: { fontSize: 28, fontWeight: '300' },
+  poznamkaText: { ...typo.caption, lineHeight: 19, flex: 1 },
 
   notFoundBox: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, padding: 40 },
-  notFoundEmoji: { fontSize: 48 },
   notFoundTitle: { ...typo.h2 },
 })

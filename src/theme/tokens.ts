@@ -63,27 +63,55 @@ export const shadows = {
   } as ViewStyle,
 } as const
 
+// ─── Fonty ───────────────────────────────────────────────────────────────
+// Jeden konzistentný, vysoko čitateľný sans-serif naprieč celou appkou:
+// **Inter** (identický vzhľad na iOS aj Androide → maximálna konzistencia +
+// brand identita). Pri custom fontoch v RN nesie váhu PRIAMO rodina
+// (fontWeight sa ignoruje), preto má každá rola explicitnú rodinu.
+// Názvy = kľúče načítané v useFonts() v app/_layout.tsx.
+export const fonts = {
+  display:     'Inter_800ExtraBold',   // hero, najväčšie nadpisy
+  displaySemi: 'Inter_700Bold',
+  black:       'Inter_800ExtraBold',
+  bold:        'Inter_700Bold',
+  semibold:    'Inter_600SemiBold',
+  medium:      'Inter_500Medium',
+  regular:     'Inter_400Regular',
+} as const
+
+/** Mapovanie číselnej váhy na rodinu — pre globálny default a inline texty. */
+export function fontFor(weight?: TextStyle['fontWeight']): string {
+  switch (String(weight)) {
+    case '800':
+    case '900': return fonts.black
+    case '700': return fonts.bold
+    case '600': return fonts.semibold
+    case '500': return fonts.medium
+    default:    return fonts.regular
+  }
+}
+
 // ─── Typography stupnica ──────────────────────────────────────────────────
 // Pomenované podľa role, nie podľa rozmeru — aby sa dali jednoducho meniť.
 export const typo = {
-  // Display — hero, najväčšie nadpisy obrazovky
-  display: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5, lineHeight: 34 } as TextStyle,
-  // H1 — title obrazovky
-  h1:      { fontSize: 22, fontWeight: '800', letterSpacing: -0.3, lineHeight: 28 } as TextStyle,
-  // H2 — väčší nadpis sekcie
-  h2:      { fontSize: 18, fontWeight: '800', letterSpacing: -0.2, lineHeight: 24 } as TextStyle,
+  // Display — hero, najväčšie nadpisy obrazovky (serif)
+  display: { fontFamily: fonts.display, fontSize: 30, letterSpacing: -0.6, lineHeight: 36 } as TextStyle,
+  // H1 — title obrazovky (serif)
+  h1:      { fontFamily: fonts.display, fontSize: 24, letterSpacing: -0.4, lineHeight: 30 } as TextStyle,
+  // H2 — väčší nadpis sekcie (grotesk)
+  h2:      { fontFamily: fonts.black, fontSize: 18, letterSpacing: -0.2, lineHeight: 24 } as TextStyle,
   // H3 — nadpis karty
-  h3:      { fontSize: 16, fontWeight: '700', lineHeight: 22 } as TextStyle,
+  h3:      { fontFamily: fonts.bold, fontSize: 16, lineHeight: 22 } as TextStyle,
   // Body
-  body:    { fontSize: 15, fontWeight: '400', lineHeight: 22 } as TextStyle,
-  bodyB:   { fontSize: 15, fontWeight: '700', lineHeight: 22 } as TextStyle,
+  body:    { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22 } as TextStyle,
+  bodyB:   { fontFamily: fonts.semibold, fontSize: 15, lineHeight: 22 } as TextStyle,
   // Small
-  caption: { fontSize: 13, fontWeight: '400', lineHeight: 18 } as TextStyle,
-  captionB:{ fontSize: 13, fontWeight: '700', lineHeight: 18 } as TextStyle,
+  caption: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 18 } as TextStyle,
+  captionB:{ fontFamily: fonts.bold, fontSize: 13, lineHeight: 18 } as TextStyle,
   // Label — uppercase section header
-  label:   { fontSize: 11, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', lineHeight: 14 } as TextStyle,
+  label:   { fontFamily: fonts.black, fontSize: 11, letterSpacing: 0.8, textTransform: 'uppercase', lineHeight: 14 } as TextStyle,
   // Micro — najmenší (badge, datum)
-  micro:   { fontSize: 11, fontWeight: '600', lineHeight: 14 } as TextStyle,
+  micro:   { fontFamily: fonts.semibold, fontSize: 11, lineHeight: 14 } as TextStyle,
 } as const
 
 // ─── Touch targets — minimum 44pt pre prístupnosť ─────────────────────────

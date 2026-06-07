@@ -1,46 +1,52 @@
 /**
  * Odpadový kalendár — 2 zobrazenia:
  *   - list (default): chronologický zoznam najbližších vývozov
- *   - month: kalendárový grid s farebnými bodkami pre dni s vývozom
+ *   - month: kalendárový grid s farebnými dňami pre vývoz
+ *
+ * Plne theme-aware (makeStyles(t)), jednotný Icon systém.
  */
 
 import { AppHeader } from '@/components/AppHeader'
-import { C } from '@/constants/colors'
+import { AnimatedEntrance, AtmosphereBackground, EmptyState, Icon, IconName, PressableScale } from '@/components/ui'
 import { useOdpady } from '@/src/hooks/useOdpady'
+import { ThemeColors, useThemeColors } from '@/src/theme/ThemeContext'
+import { radius, shadows, spacing, typo } from '@/src/theme/tokens'
 import { useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 function formatDatum(datum: string) {
   const d = new Date(datum)
   const dnes = new Date()
   const zajtra = new Date()
   zajtra.setDate(dnes.getDate() + 1)
-
   const jeD = d.toDateString() === dnes.toDateString()
   const jeZ = d.toDateString() === zajtra.toDateString()
-
   const den = d.toLocaleDateString('sk-SK', { weekday: 'long' })
   const datumStr = d.toLocaleDateString('sk-SK', { day: 'numeric', month: 'long' })
-
   if (jeD) return { hlavny: 'Dnes', sub: datumStr, urgent: true }
   if (jeZ) return { hlavny: 'Zajtra', sub: datumStr, urgent: true }
   return { hlavny: den.charAt(0).toUpperCase() + den.slice(1), sub: datumStr, urgent: false }
 }
 
 type ViewMode = 'list' | 'month'
+const MODES: { id: ViewMode; label: string; icon: IconName }[] = [
+  { id: 'list',  label: 'Zoznam', icon: 'list' },
+  { id: 'month', label: 'Mesiac', icon: 'podujatia' },
+]
 
 export default function OdpadyScreen() {
+  const t = useThemeColors()
+  const styles = useMemo(() => makeStyles(t), [t])
   const { odpady, loading, error, refresh } = useOdpady()
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [refreshing, setRefreshing] = useState(false)
@@ -52,77 +58,69 @@ export default function OdpadyScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={C.surface} />
-
-      <AppHeader
-        title="Odpadový kalendár"
-        subtitle="Najbližšie vývozy odpadu"
-      />
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <AtmosphereBackground />
+      <AppHeader title="Odpadový kalendár" subtitle="Najbližšie vývozy odpadu" />
 
       {!loading && !error && odpady.length > 0 && (
         <View style={styles.modeBar}>
-          <ModeBtn
-            label="☰ Zoznam"
-            active={viewMode === 'list'}
-            onPress={() => setViewMode('list')}
-          />
-          <ModeBtn
-            label="📅 Mesiac"
-            active={viewMode === 'month'}
-            onPress={() => setViewMode('month')}
-          />
+          {MODES.map(m => {
+            const active = viewMode === m.id
+            return (
+              <PressableScale
+                key={m.id}
+                style={[styles.modeBtn, active && styles.modeBtnActive]}
+                scaleTo={0.96}
+                onPress={() => setViewMode(m.id)}
+                accessibilityLabel={`Zobrazenie: ${m.label}`}
+              >
+                <Icon name={m.icon} size={15} color={active ? t.primary : t.textMuted} />
+                <Text style={[styles.modeBtnText, active && styles.modeBtnTextActive]}>{m.label}</Text>
+              </PressableScale>
+            )
+          })}
         </View>
       )}
 
       {loading && (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={C.primary} />
-          <Text style={styles.loadingText}>Načítavam...</Text>
+          <ActivityIndicator size="large" color={t.primary} />
+          <Text style={styles.loadingText}>Načítavam…</Text>
         </View>
       )}
 
       {error && (
-        <View style={styles.center}>
-          <Text style={styles.errorIcon}>⚠️</Text>
-          <Text style={styles.errorText}>Chyba pri načítaní</Text>
+        <View style={styles.centerPad}>
+          <EmptyState icon="info" title="Chyba pri načítaní" description="Skontrolujte pripojenie a skúste to znova." actionLabel="Skúsiť znova" onAction={handleRefresh} />
         </View>
       )}
 
       {!loading && !error && odpady.length === 0 && (
-        <View style={styles.empty}>
-          <Text style={styles.emptyIcon}>🗓️</Text>
-          <Text style={styles.emptyTitle}>Žiadne plánované vývozy</Text>
-          <Text style={styles.emptyText}>
-            Harmonogram bude doplnený. Skontrolujte oficiálnu stránku obce.
-          </Text>
+        <View style={styles.centerPad}>
+          <EmptyState icon="odpady" title="Žiadne plánované vývozy" description="Harmonogram bude doplnený. Skontrolujte oficiálnu stránku obce." />
         </View>
       )}
 
       {!loading && !error && odpady.length > 0 && viewMode === 'list' && (
         <FlatList
           data={odpady}
-          keyExtractor={(item) => item.id}
+          keyExtractor={item => item.id}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.primary} />
-          }
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={t.primary} />}
           renderItem={({ item }) => {
             const { hlavny, sub, urgent } = formatDatum(item.datum)
             return (
+              <AnimatedEntrance>
               <View style={[styles.card, urgent && styles.cardUrgent]}>
                 <View style={[styles.colorBar, { backgroundColor: item.typ.farba }]} />
                 <View style={styles.cardContent}>
                   <View style={styles.cardLeft}>
-                    <View style={[styles.typBadge, { backgroundColor: item.typ.farba + '22' }]}>
-                      <Text style={[styles.typText, { color: item.typ.farba }]}>
-                        {item.typ.nazov}
-                      </Text>
+                    <View style={[styles.typBadge, { backgroundColor: item.typ.farba + '1A' }]}>
+                      <Icon name="odpady" size={14} color={item.typ.farba} />
+                      <Text style={[styles.typText, { color: item.typ.farba }]}>{item.typ.nazov}</Text>
                     </View>
-                    {item.poznamka && (
-                      <Text style={styles.poznamka}>{item.poznamka}</Text>
-                    )}
+                    {item.poznamka && <Text style={styles.poznamka}>{item.poznamka}</Text>}
                   </View>
                   <View style={styles.cardRight}>
                     <Text style={[styles.denText, urgent && styles.denUrgent]}>{hlavny}</Text>
@@ -130,6 +128,7 @@ export default function OdpadyScreen() {
                   </View>
                 </View>
               </View>
+              </AnimatedEntrance>
             )
           }}
         />
@@ -142,25 +141,6 @@ export default function OdpadyScreen() {
   )
 }
 
-// ─── Mode button ────────────────────────────────────────────────────────────
-function ModeBtn({ label, active, onPress }: {
-  label: string
-  active: boolean
-  onPress: () => void
-}) {
-  return (
-    <TouchableOpacity
-      style={[styles.modeBtn, active && styles.modeBtnActive]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <Text style={[styles.modeBtnText, active && styles.modeBtnTextActive]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
-  )
-}
-
 // ─── Mesačný kalendár ───────────────────────────────────────────────────────
 type OdpadItem = ReturnType<typeof useOdpady>['odpady'][number]
 
@@ -170,10 +150,11 @@ const MESIACE_SK = [
 ]
 
 function MesacnyKalendar({ odpady }: { odpady: OdpadItem[] }) {
+  const t = useThemeColors()
+  const styles = useMemo(() => makeStyles(t), [t])
   const [zobrazeny, setZobrazeny] = useState(new Date())
   const [vybrany, setVybrany] = useState<Date | null>(null)
 
-  // Mapa "YYYY-MM-DD" → list odpadov v ten deň
   const podlaDna = useMemo(() => {
     const m: Record<string, OdpadItem[]> = {}
     odpady.forEach(o => {
@@ -188,63 +169,38 @@ function MesacnyKalendar({ odpady }: { odpady: OdpadItem[] }) {
   const mesiac = zobrazeny.getMonth()
   const prvyDen = new Date(rok, mesiac, 1)
   const dniVMesiaci = new Date(rok, mesiac + 1, 0).getDate()
-  // Po=1, Ut=2, ..., Ne=7. JS getDay vracia Ne=0, takže prepočet:
-  const startDay = (prvyDen.getDay() + 6) % 7 // 0=Po
+  const startDay = (prvyDen.getDay() + 6) % 7
   const dnes = new Date()
 
-  // Vybrané dni
   const vybranyKey = vybrany ? vybrany.toISOString().split('T')[0] : null
   const odpadyVybranehoDna = vybranyKey ? podlaDna[vybranyKey] ?? [] : []
 
-  // Pole buniek (5-6 týždňov)
   const cells: (number | null)[] = []
   for (let i = 0; i < startDay; i++) cells.push(null)
   for (let d = 1; d <= dniVMesiaci; d++) cells.push(d)
   while (cells.length % 7 !== 0) cells.push(null)
 
-  function predchadzajuci() {
-    setZobrazeny(new Date(rok, mesiac - 1, 1))
-    setVybrany(null)
-  }
-  function nasledujuci() {
-    setZobrazeny(new Date(rok, mesiac + 1, 1))
-    setVybrany(null)
-  }
-
-  function keyFor(d: number) {
-    const date = new Date(rok, mesiac, d)
-    return date.toISOString().split('T')[0]
-  }
+  function predchadzajuci() { setZobrazeny(new Date(rok, mesiac - 1, 1)); setVybrany(null) }
+  function nasledujuci() { setZobrazeny(new Date(rok, mesiac + 1, 1)); setVybrany(null) }
+  function keyFor(d: number) { return new Date(rok, mesiac, d).toISOString().split('T')[0] }
 
   return (
-    <ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={{ paddingBottom: 24 }}
-      showsVerticalScrollIndicator={false}
-    >
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: spacing.xl }} showsVerticalScrollIndicator={false}>
       {/* Mesiac navigátor */}
       <View style={styles.monthNav}>
-        <TouchableOpacity onPress={predchadzajuci} style={styles.navBtn}>
-          <Text style={styles.navBtnText}>←</Text>
-        </TouchableOpacity>
+        <PressableScale onPress={predchadzajuci} style={styles.navBtn} scaleTo={0.9} accessibilityLabel="Predchádzajúci mesiac">
+          <Icon name="chevronBack" size={20} color={t.primary} />
+        </PressableScale>
         <Text style={styles.monthTitle}>{MESIACE_SK[mesiac]} {rok}</Text>
-        <TouchableOpacity onPress={nasledujuci} style={styles.navBtn}>
-          <Text style={styles.navBtnText}>→</Text>
-        </TouchableOpacity>
+        <PressableScale onPress={nasledujuci} style={styles.navBtn} scaleTo={0.9} accessibilityLabel="Nasledujúci mesiac">
+          <Icon name="chevron" size={20} color={t.primary} />
+        </PressableScale>
       </View>
 
       {/* Hlavička dní */}
       <View style={styles.weekHeader}>
         {['Po', 'Ut', 'St', 'Št', 'Pi', 'So', 'Ne'].map((d, i) => (
-          <Text
-            key={d}
-            style={[
-              styles.weekDay,
-              (i === 5 || i === 6) && { color: C.textMuted },
-            ]}
-          >
-            {d}
-          </Text>
+          <Text key={d} style={[styles.weekDay, (i === 5 || i === 6) && { color: t.textMuted }]}>{d}</Text>
         ))}
       </View>
 
@@ -252,76 +208,34 @@ function MesacnyKalendar({ odpady }: { odpady: OdpadItem[] }) {
       <View style={styles.calendarGrid}>
         {cells.map((d, idx) => {
           if (d === null) {
-            return (
-              <View key={idx} style={styles.dayCell}>
-                <View style={styles.dayCellInner} />
-              </View>
-            )
+            return <View key={idx} style={styles.dayCell}><View style={styles.dayCellInner} /></View>
           }
           const key = keyFor(d)
           const odpadyTohoDna = podlaDna[key] ?? []
-          const isToday =
-            dnes.getFullYear() === rok &&
-            dnes.getMonth() === mesiac &&
-            dnes.getDate() === d
+          const isToday = dnes.getFullYear() === rok && dnes.getMonth() === mesiac && dnes.getDate() === d
           const isSelected = vybranyKey === key
           const maOdpad = odpadyTohoDna.length > 0
-
-          // Pri viacerých typoch v jeden deň rozdelíme bunku na farebné pruhy.
-          // Pri jednom type celá bunka vyfarbená.
           return (
             <View key={idx} style={styles.dayCell}>
               <TouchableOpacity
-                style={[
-                  styles.dayCellInner,
-                  isToday && !maOdpad && styles.dayCellToday,
-                  isSelected && styles.dayCellSelected,
-                ]}
+                style={[styles.dayCellInner, isToday && !maOdpad && styles.dayCellToday, isSelected && styles.dayCellSelected]}
                 activeOpacity={0.7}
                 onPress={() => setVybrany(new Date(rok, mesiac, d))}
               >
-                {/* Farebné pozadie podľa typu(ov) odpadu */}
                 {maOdpad && (
                   <View style={styles.dayBgWrap} pointerEvents="none">
                     {odpadyTohoDna.map((o, i) => (
-                      <View
-                        key={i}
-                        style={{
-                          flex: 1,
-                          backgroundColor: o.typ.farba,
-                        }}
-                      />
+                      <View key={i} style={{ flex: 1, backgroundColor: o.typ.farba }} />
                     ))}
                   </View>
                 )}
-
-                {/* Číslo dňa */}
-                <Text style={[
-                  styles.dayNum,
-                  isToday && !maOdpad && styles.dayNumToday,
-                  maOdpad && styles.dayNumOnColor,
-                ]}>
-                  {d}
-                </Text>
-
-                {/* Názvy typov odpadu — biele písmo na farebnom pozadí */}
+                <Text style={[styles.dayNum, isToday && !maOdpad && styles.dayNumToday, maOdpad && styles.dayNumOnColor]}>{d}</Text>
                 {maOdpad && (
                   <View style={styles.typBlock}>
                     {odpadyTohoDna.slice(0, 2).map((o, i) => (
-                      <Text
-                        key={i}
-                        style={styles.typLabel}
-                        numberOfLines={1}
-                        ellipsizeMode="tail"
-                      >
-                        {o.typ.nazov}
-                      </Text>
+                      <Text key={i} style={styles.typLabel} numberOfLines={1} ellipsizeMode="tail">{o.typ.nazov}</Text>
                     ))}
-                    {odpadyTohoDna.length > 2 && (
-                      <Text style={styles.typMoreText}>
-                        +{odpadyTohoDna.length - 2} ďalší
-                      </Text>
-                    )}
+                    {odpadyTohoDna.length > 2 && <Text style={styles.typMoreText}>+{odpadyTohoDna.length - 2} ďalší</Text>}
                   </View>
                 )}
               </TouchableOpacity>
@@ -335,26 +249,21 @@ function MesacnyKalendar({ odpady }: { odpady: OdpadItem[] }) {
         {vybrany ? (
           <>
             <Text style={styles.detailTitle}>
-              {vybrany.toLocaleDateString('sk-SK', {
-                weekday: 'long', day: 'numeric', month: 'long',
-              })}
+              {vybrany.toLocaleDateString('sk-SK', { weekday: 'long', day: 'numeric', month: 'long' })}
             </Text>
             {odpadyVybranehoDna.length === 0 ? (
               <Text style={styles.detailEmpty}>V tento deň nie je naplánovaný žiadny vývoz.</Text>
             ) : (
-              <View style={{ gap: 8 }}>
+              <View style={{ gap: spacing.sm }}>
                 {odpadyVybranehoDna.map(o => (
                   <View key={o.id} style={styles.detailRow}>
                     <View style={[styles.detailBar, { backgroundColor: o.typ.farba }]} />
                     <View style={{ flex: 1 }}>
-                      <View style={[styles.typBadge, { backgroundColor: o.typ.farba + '22', alignSelf: 'flex-start' }]}>
-                        <Text style={[styles.typText, { color: o.typ.farba }]}>
-                          {o.typ.nazov}
-                        </Text>
+                      <View style={[styles.typBadge, { backgroundColor: o.typ.farba + '1A', alignSelf: 'flex-start' }]}>
+                        <Icon name="odpady" size={14} color={o.typ.farba} />
+                        <Text style={[styles.typText, { color: o.typ.farba }]}>{o.typ.nazov}</Text>
                       </View>
-                      {o.poznamka && (
-                        <Text style={[styles.poznamka, { marginTop: 4 }]}>{o.poznamka}</Text>
-                      )}
+                      {o.poznamka && <Text style={[styles.poznamka, { marginTop: 4 }]}>{o.poznamka}</Text>}
                     </View>
                   </View>
                 ))}
@@ -362,216 +271,96 @@ function MesacnyKalendar({ odpady }: { odpady: OdpadItem[] }) {
             )}
           </>
         ) : (
-          <Text style={styles.detailHint}>
-            Klikni na deň pre zobrazenie typov odpadu.
-          </Text>
+          <Text style={styles.detailHint}>Klepnite na deň pre zobrazenie typov odpadu.</Text>
         )}
       </View>
     </ScrollView>
   )
 }
 
-// ─── Štýly ──────────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.background },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8 },
-  loadingText: { color: C.textMuted, fontSize: 14, marginTop: 8 },
-  errorIcon: { fontSize: 36 },
-  errorText: { color: C.brand.red, fontSize: 15 },
+// ─── Štýly (theme-aware factory) ────────────────────────────────────────────
+const makeStyles = (t: ThemeColors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: t.background },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.sm },
+  centerPad: { flex: 1, justifyContent: 'center' },
+  loadingText: { ...typo.caption, color: t.textMuted, marginTop: spacing.sm },
 
-  empty: {
-    flex: 1, justifyContent: 'center', alignItems: 'center',
-    paddingHorizontal: 40, gap: 8,
-  },
-  emptyIcon: { fontSize: 56, marginBottom: 8 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: C.text },
-  emptyText: {
-    fontSize: 14, color: C.textMuted, textAlign: 'center',
-    lineHeight: 20, marginTop: 4,
-  },
-
-  // Mode bar
   modeBar: {
-    flexDirection: 'row',
-    paddingHorizontal: 16, paddingVertical: 10,
-    gap: 8,
-    backgroundColor: C.surface,
-    borderBottomWidth: 1, borderBottomColor: C.borderLight,
+    flexDirection: 'row', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, gap: spacing.sm,
+    backgroundColor: t.surface, borderBottomWidth: 1, borderBottomColor: t.borderLight,
   },
   modeBtn: {
-    flex: 1, paddingVertical: 8,
-    borderRadius: 8, backgroundColor: C.surfaceAlt,
-    alignItems: 'center',
+    flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5,
+    paddingVertical: spacing.sm, borderRadius: radius.sm, backgroundColor: t.surfaceAlt,
     borderWidth: 1, borderColor: 'transparent',
   },
-  modeBtnActive: { backgroundColor: C.primaryLight, borderColor: C.primary },
-  modeBtnText: { fontSize: 12, fontWeight: '700', color: C.textMuted },
-  modeBtnTextActive: { color: C.primary },
+  modeBtnActive: { backgroundColor: t.primaryLight, borderColor: t.primary },
+  modeBtnText: { fontSize: 12, fontWeight: '700', color: t.textMuted },
+  modeBtnTextActive: { color: t.primary },
 
-  // LIST
-  list: { padding: 16, gap: 10 },
+  list: { padding: spacing.lg, gap: spacing.sm },
   card: {
-    backgroundColor: C.surface, borderRadius: 14,
-    flexDirection: 'row', overflow: 'hidden',
-    shadowColor: C.shadow, shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
+    backgroundColor: t.surface, borderRadius: radius.lg, flexDirection: 'row', overflow: 'hidden',
+    shadowColor: t.shadow, ...shadows.sm,
   },
-  cardUrgent: { shadowOpacity: 0.12, shadowRadius: 10, elevation: 4 },
+  cardUrgent: { ...shadows.md, shadowColor: t.shadow },
   colorBar: { width: 5 },
-  cardContent: {
-    flex: 1, flexDirection: 'row',
-    justifyContent: 'space-between', alignItems: 'center',
-    padding: 14,
-  },
+  cardContent: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md },
   cardLeft: { flex: 1, gap: 4 },
   cardRight: { alignItems: 'flex-end' },
   typBadge: {
-    alignSelf: 'flex-start',
-    borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4,
+    flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start',
+    borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 4,
   },
-  typText: { fontSize: 13, fontWeight: '700' },
-  poznamka: { fontSize: 12, color: C.textMuted },
-  denText: { fontSize: 15, fontWeight: '700', color: C.text },
-  denUrgent: { color: C.primary },
-  datumText: { fontSize: 12, color: C.textPlaceholder, marginTop: 2 },
+  typText: { fontSize: 13, fontWeight: '800' },
+  poznamka: { ...typo.caption, color: t.textMuted },
+  denText: { ...typo.h3, color: t.text },
+  denUrgent: { color: t.primary },
+  datumText: { ...typo.micro, color: t.textPlaceholder, marginTop: 2 },
 
-  // Kalendár navigátor
   monthNav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 12,
-    backgroundColor: C.surface,
-    borderBottomWidth: 1, borderBottomColor: C.borderLight,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+    backgroundColor: t.surface, borderBottomWidth: 1, borderBottomColor: t.borderLight,
   },
-  monthTitle: {
-    fontSize: 17, fontWeight: '800', color: C.text,
-    textTransform: 'capitalize',
-  },
-  navBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: C.primaryLight,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  navBtnText: { fontSize: 18, fontWeight: '900', color: C.primary },
+  monthTitle: { ...typo.h2, color: t.text, textTransform: 'capitalize' },
+  navBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: t.primaryLight, justifyContent: 'center', alignItems: 'center' },
 
-  weekHeader: {
-    flexDirection: 'row',
-    paddingHorizontal: 8, paddingVertical: 10,
-    backgroundColor: C.surface,
-  },
-  weekDay: {
-    flex: 1, textAlign: 'center',
-    fontSize: 12, fontWeight: '800', color: C.textSecondary,
-    letterSpacing: 0.5,
-  },
+  weekHeader: { flexDirection: 'row', paddingHorizontal: spacing.sm, paddingVertical: spacing.sm, backgroundColor: t.surface },
+  weekDay: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '800', color: t.textSecondary, letterSpacing: 0.5 },
 
-  calendarGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    backgroundColor: C.surface,
-  },
-  dayCell: {
-    // 7 stĺpcov bez gap (gap + width: 100/7% spôsobuje pretekanie)
-    // Margin 2px na každú stranu vytvorí 4px efektívny gap medzi bunkami,
-    // a bunka má `boxSizing: 'border-box'` semantiku v RN — všetko sa zmestí.
-    width: `${100 / 7}%`,
-    padding: 2,
-    // aspectRatio aplikujeme na vnútorný wrapper aby gap fungoval správne
-  },
+  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 6, paddingVertical: 4, backgroundColor: t.surface },
+  dayCell: { width: `${100 / 7}%`, padding: 2 },
   dayCellInner: {
-    aspectRatio: 1,
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-    paddingTop: 4,
-    borderRadius: 10,
-    overflow: 'hidden',
-    position: 'relative',
+    aspectRatio: 1, justifyContent: 'flex-start', alignItems: 'center', paddingTop: 4,
+    borderRadius: radius.sm, overflow: 'hidden', position: 'relative',
   },
-  dayCellToday: {
-    backgroundColor: C.primaryLight,
-  },
-  dayCellSelected: {
-    borderWidth: 3,
-    borderColor: C.accent,
-  },
-
-  // Farebné pozadie pre dni s vývozom (vyplní celú bunku, pri 2+ typoch
-  // sa rozdelí na rovnaké horizontálne pruhy).
-  dayBgWrap: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    flexDirection: 'column',
-  },
-
-  dayNum: { fontSize: 14, fontWeight: '700', color: C.text },
-  dayNumToday: { color: C.primary, fontWeight: '900' },
+  dayCellToday: { backgroundColor: t.primaryLight },
+  dayCellSelected: { borderWidth: 3, borderColor: t.accent },
+  dayBgWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, flexDirection: 'column' },
+  dayNum: { fontSize: 14, fontWeight: '700', color: t.text },
+  dayNumToday: { color: t.primary, fontWeight: '900' },
   dayNumOnColor: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-    textShadowColor: 'rgba(0,0,0,0.25)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    color: '#FFFFFF', fontWeight: '900',
+    textShadowColor: 'rgba(0,0,0,0.25)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
-
-  // Názvy typov odpadu v bunke
-  typBlock: {
-    position: 'absolute',
-    bottom: 4,
-    left: 2,
-    right: 2,
-    alignItems: 'center',
-    gap: 1,
-  },
+  typBlock: { position: 'absolute', bottom: 4, left: 2, right: 2, alignItems: 'center', gap: 1 },
   typLabel: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '800',
-    textAlign: 'center',
-    letterSpacing: 0.2,
-    textShadowColor: 'rgba(0,0,0,0.35)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-    maxWidth: '100%',
+    color: '#FFFFFF', fontSize: 10, fontWeight: '800', textAlign: 'center', letterSpacing: 0.2,
+    textShadowColor: 'rgba(0,0,0,0.35)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2, maxWidth: '100%',
   },
   typMoreText: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 9,
-    fontWeight: '700',
-    textShadowColor: 'rgba(0,0,0,0.25)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 1,
+    color: 'rgba(255,255,255,0.9)', fontSize: 9, fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.25)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 1,
   },
 
-  // Detail vybraného dňa
   detailBox: {
-    margin: 16,
-    padding: 14,
-    backgroundColor: C.surface,
-    borderRadius: 14,
-    minHeight: 100,
-    shadowColor: C.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
+    margin: spacing.lg, padding: spacing.md, backgroundColor: t.surface, borderRadius: radius.lg,
+    minHeight: 100, shadowColor: t.shadow, ...shadows.sm,
   },
-  detailTitle: {
-    fontSize: 14, fontWeight: '800', color: C.text,
-    textTransform: 'capitalize',
-    marginBottom: 10,
-  },
-  detailEmpty: { fontSize: 13, color: C.textMuted, fontStyle: 'italic' },
-  detailHint: { fontSize: 13, color: C.textMuted, textAlign: 'center', paddingVertical: 8 },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: C.background,
-    borderRadius: 10,
-    padding: 10,
-  },
+  detailTitle: { ...typo.bodyB, color: t.text, textTransform: 'capitalize', marginBottom: spacing.md },
+  detailEmpty: { ...typo.caption, color: t.textMuted, fontStyle: 'italic' },
+  detailHint: { ...typo.caption, color: t.textMuted, textAlign: 'center', paddingVertical: spacing.sm },
+  detailRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: t.background, borderRadius: radius.md, padding: spacing.md },
   detailBar: { width: 4, height: 28, borderRadius: 2 },
 })

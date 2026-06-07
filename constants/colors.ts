@@ -51,6 +51,47 @@ export const VOColors = {
     accent:  { bg: '#F3E5F5', fg: '#6A1B9A' },
   },
 
+  // Akcentové farby funkcií/dlaždíc — single source of truth namiesto
+  // hardkódovaných hexov po obrazovkách (menu "Viac", rýchle akcie…).
+  feature: {
+    slate:     '#37474F',  // kontakty, neutrálne
+    blue:      '#1565C0',  // šport, info
+    lightBlue: '#0277BD',  // počasie, okolie
+    teal:      '#00838F',  // služby, meteo
+    indigo:    '#0D47A1',  // smart obec, mapa
+    purple:    '#6A1B9A',  // Marta (AI referentka)
+    purpleAlt: '#7B1FA2',  // ankety
+    brown:     '#5D4037',  // farské oznamy, senior
+    orange:    '#F57F17',  // cestovný poriadok
+    greenDark: '#1B5E20',  // FC
+  },
+
+  // Farby kategórií aktualít (badge, placeholder, ikona)
+  category: {
+    oznam:     '#1565C0',
+    akcia:     '#2E7D32',
+    uzavierka: '#F57F17',
+    vypadok:   '#C62828',
+    sport:     '#1565C0',
+    ine:       '#607D8B',
+  },
+
+  // Gradientové dvojice — pre farebné ikonové dlaždice a akcentové plochy.
+  // Sýte a kontrastné; biela ikona na nich vždy vynikne (WCAG AA+).
+  gradients: {
+    red:    ['#EF5350', '#C62828'],
+    gold:   ['#FFB300', '#F57F17'],
+    green:  ['#4CAF50', '#2E7D32'],
+    blue:   ['#42A5F5', '#1565C0'],
+    teal:   ['#26C6DA', '#00838F'],
+    purple: ['#AB47BC', '#6A1B9A'],
+    slate:  ['#607D8B', '#37474F'],
+    orange: ['#FFA726', '#EF6C00'],
+    indigo: ['#5C6BC0', '#283593'],
+    brown:  ['#8D6E63', '#4E342E'],
+    pink:   ['#EC407A', '#AD1457'],
+  },
+
   // Povrchy & texty
   background: '#F7F8FA',
   surface: '#FFFFFF',

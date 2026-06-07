@@ -9,10 +9,9 @@
  */
 
 import { AppHeader } from '@/components/AppHeader'
-import { Badge, Card, EmptyState, Skeleton } from '@/components/ui'
+import { AtmosphereBackground, Badge, Card, EmptyState, Icon, IconName, PressableScale, Skeleton } from '@/components/ui'
 import { useTenant } from '@/src/config/tenant'
 import {
-  FARSKY_TYP_EMOJI,
   FARSKY_TYP_LABEL,
   FARSKY_TYP_TONE,
   FarskyOznam,
@@ -25,14 +24,17 @@ import { useMemo, useState } from 'react'
 import {
   Linking,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+
+const FARSKY_TYP_ICON: Record<string, IconName> = {
+  omsa: 'time', smutok: 'info', krst: 'water', sobas: 'people', ohlaska: 'farske', oznam: 'farske',
+}
+const farskyIcon = (typ: string): IconName => FARSKY_TYP_ICON[typ] ?? 'farske'
 
 const FILTRE: { id: 'vsetko' | FarskyTypOznamu; label: string }[] = [
   { id: 'vsetko',  label: 'Všetko' },
@@ -85,8 +87,8 @@ export default function FarskeOznamyScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: t.background }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={t.surface} />
+    <SafeAreaView style={[styles.safe, { backgroundColor: t.background }]} edges={['top']}>
+      <AtmosphereBackground />
       <AppHeader title="Farské oznamy" subtitle="Omše, smútočné, ohlášky" />
 
       {/* Najbližšia omša (z tenant configu) */}
@@ -106,26 +108,19 @@ export default function FarskeOznamyScreen() {
           {FILTRE.map(f => {
             const active = filter === f.id
             return (
-              <TouchableOpacity
+              <PressableScale
                 key={f.id}
                 style={[
                   styles.chip,
                   { backgroundColor: t.surfaceAlt, borderColor: t.border },
                   active && { backgroundColor: t.primaryLight, borderColor: t.primary },
                 ]}
+                scaleTo={0.95}
                 onPress={() => setFilter(f.id)}
-                activeOpacity={0.75}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
+                accessibilityLabel={f.label}
               >
-                <Text style={[
-                  styles.chipText,
-                  { color: t.textSecondary },
-                  active && { color: t.primary, fontWeight: '900' },
-                ]}>
-                  {f.label}
-                </Text>
-              </TouchableOpacity>
+                <Text style={[styles.chipText, { color: active ? t.primary : t.textSecondary }]}>{f.label}</Text>
+              </PressableScale>
             )
           })}
         </ScrollView>
@@ -152,7 +147,7 @@ export default function FarskeOznamyScreen() {
           </>
         ) : filtrovane.length === 0 ? (
           <EmptyState
-            icon="⛪"
+            icon="farske"
             title={error ? 'Farské oznamy zatiaľ neaktívne' : 'Žiadne oznamy'}
             description={
               error
@@ -210,7 +205,9 @@ function NajblizsiaOmsa() {
 
   return (
     <View style={styles.omsaCard}>
-      <Text style={styles.omsaEmoji}>🙏</Text>
+      <View style={[styles.omsaIconBox, { backgroundColor: t.primaryLight }]}>
+        <Icon name="time" size={22} color={t.primary} />
+      </View>
       <View style={{ flex: 1 }}>
         <Text style={[styles.omsaLabel, { color: t.textMuted }]}>NAJBLIŽŠIA SV. OMŠA</Text>
         <Text style={[styles.omsaHlavny, { color: t.text }]}>
@@ -230,8 +227,8 @@ function OznamKarta({ oznam }: { oznam: FarskyOznam }) {
     <View style={{ marginBottom: spacing.md }}>
       <Card padding={0}>
         <View style={styles.oznamObsah}>
-          <View style={[styles.oznamIkonaBox, { backgroundColor: t.surfaceAlt }]}>
-            <Text style={styles.oznamIkona}>{FARSKY_TYP_EMOJI[oznam.typ]}</Text>
+          <View style={[styles.oznamIkonaBox, { backgroundColor: t.primaryLight }]}>
+            <Icon name={farskyIcon(oznam.typ)} size={24} color={t.primary} />
           </View>
           <View style={{ flex: 1, gap: 4 }}>
             <View style={styles.oznamTopRow}>
@@ -255,14 +252,10 @@ function OznamKarta({ oznam }: { oznam: FarskyOznam }) {
             )}
             <View style={styles.oznamMeta}>
               {oznam.datum_od && (
-                <Text style={[styles.oznamMetaText, { color: t.textMuted }]}>
-                  📅 {formatDatum(oznam.datum_od)}
-                </Text>
+                <View style={styles.metaItem}><Icon name="podujatia" size={12} color={t.textMuted} /><Text style={[styles.oznamMetaText, { color: t.textMuted }]}>{formatDatum(oznam.datum_od)}</Text></View>
               )}
               {oznam.miesto && (
-                <Text style={[styles.oznamMetaText, { color: t.textMuted }]}>
-                  📍 {oznam.miesto}
-                </Text>
+                <View style={styles.metaItem}><Icon name="location" size={12} color={t.textMuted} /><Text style={[styles.oznamMetaText, { color: t.textMuted }]}>{oznam.miesto}</Text></View>
               )}
             </View>
           </View>
@@ -281,7 +274,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
   },
-  omsaEmoji: { fontSize: 32 },
+  omsaIconBox: { width: 48, height: 48, borderRadius: radius.md, justifyContent: 'center', alignItems: 'center' },
   omsaLabel: { ...typo.label, marginBottom: 2 },
   omsaHlavny: { ...typo.h3 },
 
@@ -312,5 +305,6 @@ const styles = StyleSheet.create({
   oznamNazov: { ...typo.h3, marginTop: 2 },
   oznamPopis: { ...typo.caption, marginTop: 2 },
   oznamMeta: { flexDirection: 'row', gap: spacing.md, marginTop: 6, flexWrap: 'wrap' },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   oznamMetaText: { ...typo.micro },
 })
