@@ -17,7 +17,7 @@
  */
 
 import LeafletMap, { LeafletCircle, LeafletMarker } from '@/components/LeafletMap'
-import { Badge, Card } from '@/components/ui'
+import { AtmosphereBackground, Badge, Card, Icon, IconName, PressableScale } from '@/components/ui'
 import {
   useTenant,
   VolnyCasKategoria,
@@ -28,14 +28,12 @@ import { useRouter } from 'expo-router'
 import { useMemo, useState } from 'react'
 import {
   Linking,
-  SafeAreaView,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 // ─── Konštanty ────────────────────────────────────────────────────────────
 const OKOLIE_MODRA = '#0277BD'
@@ -46,16 +44,16 @@ const RADIUSY: { km: number; label: string }[] = [
   { km: 50, label: '50 km' },
 ]
 
-const KAT_META: Record<VolnyCasKategoria | 'vsetko', { label: string; emoji: string; color: string }> = {
-  vsetko:     { label: 'Všetko',       emoji: '🗺️', color: OKOLIE_MODRA },
-  cyklotrasa: { label: 'Cyklotrasy',   emoji: '🚴', color: '#00838F' },
-  turistika:  { label: 'Turistika',    emoji: '🥾', color: '#1B5E20' },
-  deti:       { label: 'Pre deti',     emoji: '👶', color: '#F57F17' },
-  wellness:   { label: 'Wellness',     emoji: '♨️', color: '#AD1457' },
-  kultura:    { label: 'Kultúra',      emoji: '🏰', color: '#5D4037' },
-  priroda:    { label: 'Príroda',      emoji: '🌳', color: '#2E7D32' },
-  sport:      { label: 'Šport',        emoji: '⚽', color: '#1565C0' },
-  vylet:      { label: 'Výlety',       emoji: '🚌', color: '#6A1B9A' },
+const KAT_META: Record<VolnyCasKategoria | 'vsetko', { label: string; emoji: string; icon: IconName; color: string }> = {
+  vsetko:     { label: 'Všetko',       emoji: '🗺️', icon: 'grid',     color: OKOLIE_MODRA },
+  cyklotrasa: { label: 'Cyklotrasy',   emoji: '🚴', icon: 'bicycle',  color: '#00838F' },
+  turistika:  { label: 'Turistika',    emoji: '🥾', icon: 'walk',     color: '#1B5E20' },
+  deti:       { label: 'Pre deti',     emoji: '👶', icon: 'happy',    color: '#F57F17' },
+  wellness:   { label: 'Wellness',     emoji: '♨️', icon: 'water',    color: '#AD1457' },
+  kultura:    { label: 'Kultúra',      emoji: '🏰', icon: 'sparkles', color: '#5D4037' },
+  priroda:    { label: 'Príroda',      emoji: '🌳', icon: 'leaf',     color: '#2E7D32' },
+  sport:      { label: 'Šport',        emoji: '⚽', icon: 'fc',       color: '#1565C0' },
+  vylet:      { label: 'Výlety',       emoji: '🚌', icon: 'bus2',     color: '#6A1B9A' },
 }
 
 // ─── Haversine: vzdialenosť medzi dvomi GPS bodmi v km ───────────────────
@@ -143,15 +141,18 @@ export default function OkolieScreen() {
   }, [miestaSVzdialenost, radius])
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: t.background }]}>
-      <StatusBar barStyle="light-content" backgroundColor={OKOLIE_MODRA} />
+    <SafeAreaView style={[styles.safe, { backgroundColor: t.background }]} edges={['top']}>
+      <AtmosphereBackground tint={OKOLIE_MODRA} />
 
       {/* Header */}
       <View style={[styles.header, { backgroundColor: OKOLIE_MODRA }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.back} hitSlop={10}>
-          <Text style={styles.backText}>← Späť</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>🌍 Voľný čas v okolí</Text>
+        <PressableScale onPress={() => router.back()} style={styles.back} scaleTo={0.94} accessibilityLabel="Späť">
+          <Icon name="chevronBack" size={20} color="#FFFFFF" /><Text style={styles.backText}>Späť</Text>
+        </PressableScale>
+        <View style={styles.headerTitleRow}>
+          <Icon name="okolie" size={22} color="#FFFFFF" />
+          <Text style={styles.headerTitle}>Voľný čas v okolí</Text>
+        </View>
         <Text style={styles.headerSub}>
           {filtrovane.length} {filtrovane.length === 1 ? 'tip' : filtrovane.length < 5 ? 'tipy' : 'tipov'}
           {' '}do {radius} km · {tenant.nazov}
@@ -165,26 +166,19 @@ export default function OkolieScreen() {
           {RADIUSY.map(r => {
             const active = radius === r.km
             return (
-              <TouchableOpacity
+              <PressableScale
                 key={r.km}
                 style={[
                   styles.radiusBtn,
                   { backgroundColor: t.surfaceAlt, borderColor: t.border },
                   active && { backgroundColor: OKOLIE_MODRA, borderColor: OKOLIE_MODRA },
                 ]}
+                scaleTo={0.96}
                 onPress={() => { setRadius(r.km as 10 | 20 | 50); setVybraneId(null) }}
-                activeOpacity={0.85}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
+                accessibilityLabel={r.label}
               >
-                <Text style={[
-                  styles.radiusBtnText,
-                  { color: t.textSecondary },
-                  active && { color: '#FFFFFF', fontWeight: '900' },
-                ]}>
-                  {r.label}
-                </Text>
-              </TouchableOpacity>
+                <Text style={[styles.radiusBtnText, { color: active ? '#FFFFFF' : t.textSecondary }]}>{r.label}</Text>
+              </PressableScale>
             )
           })}
         </View>
@@ -202,27 +196,22 @@ export default function OkolieScreen() {
             const active = kategoria === k
             const count = k === 'vsetko' ? Object.values(statyKategorie).reduce((a, b) => a + b, 0) : (statyKategorie[k] ?? 0)
             return (
-              <TouchableOpacity
+              <PressableScale
                 key={k}
                 style={[
                   styles.chip,
                   { backgroundColor: t.surface, borderColor: t.border },
                   active && { backgroundColor: meta.color, borderColor: meta.color },
                 ]}
+                scaleTo={0.95}
                 onPress={() => { setKategoria(k); setVybraneId(null) }}
-                activeOpacity={0.75}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
+                accessibilityLabel={meta.label}
               >
-                <Text style={[
-                  styles.chipText,
-                  { color: t.textSecondary },
-                  active && { color: '#FFFFFF', fontWeight: '900' },
-                ]}>
-                  {meta.emoji} {meta.label}
-                  {count > 0 && <Text style={{ fontWeight: '900' }}> · {count}</Text>}
+                <Icon name={meta.icon} size={14} color={active ? '#FFFFFF' : t.textSecondary} />
+                <Text style={[styles.chipText, { color: active ? '#FFFFFF' : t.textSecondary }]}>
+                  {meta.label}{count > 0 ? ` · ${count}` : ''}
                 </Text>
-              </TouchableOpacity>
+              </PressableScale>
             )
           })}
         </ScrollView>
@@ -258,19 +247,16 @@ export default function OkolieScreen() {
                       style={{ backgroundColor: KAT_META[vybrane.kategoria].color + '22' }}
                       textStyle={{ color: KAT_META[vybrane.kategoria].color }}
                     />
-                    <Text style={[styles.distancePill, { backgroundColor: t.primaryLight, color: t.primary }]}>
-                      📏 {formatVzdialenost(vybrane.vzdialenostKm)}
-                    </Text>
+                    <View style={[styles.distancePill, { backgroundColor: t.primaryLight }]}>
+                      <Icon name="navigate" size={11} color={t.primary} />
+                      <Text style={[styles.distancePillText, { color: t.primary }]}>{formatVzdialenost(vybrane.vzdialenostKm)}</Text>
+                    </View>
                   </View>
                   <Text style={[styles.detailTitul, { color: t.text }]}>{vybrane.nazov}</Text>
                 </View>
-                <TouchableOpacity
-                  onPress={() => setVybraneId(null)}
-                  hitSlop={10}
-                  style={styles.detailClose}
-                >
-                  <Text style={[styles.detailCloseTxt, { color: t.textMuted }]}>✕</Text>
-                </TouchableOpacity>
+                <PressableScale onPress={() => setVybraneId(null)} scaleTo={0.85} style={styles.detailClose} accessibilityLabel="Zavrieť">
+                  <Icon name="close" size={20} color={t.textMuted} />
+                </PressableScale>
               </View>
 
               {vybrane.popis && (
@@ -281,10 +267,9 @@ export default function OkolieScreen() {
 
               <View style={styles.metaPills}>
                 {vybrane.trvanie && (
-                  <View style={[styles.metaPill, { backgroundColor: t.surfaceAlt }]}>
-                    <Text style={[styles.metaPillText, { color: t.textSecondary }]}>
-                      ⏱ {vybrane.trvanie}
-                    </Text>
+                  <View style={[styles.metaPill, styles.metaPillRow, { backgroundColor: t.surfaceAlt }]}>
+                    <Icon name="time" size={11} color={t.textSecondary} />
+                    <Text style={[styles.metaPillText, { color: t.textSecondary }]}>{vybrane.trvanie}</Text>
                   </View>
                 )}
                 {vybrane.tagy?.map(tag => (
@@ -297,22 +282,18 @@ export default function OkolieScreen() {
               </View>
 
               <View style={styles.actionRow}>
-                <TouchableOpacity
+                <PressableScale
                   style={[styles.actionBtn, { backgroundColor: OKOLIE_MODRA }]}
-                  onPress={() => {
-                    const url = `https://www.google.com/maps/dir/?api=1&destination=${vybrane.lat},${vybrane.lng}`
-                    Linking.openURL(url)
-                  }}
+                  scaleTo={0.96}
+                  onPress={() => Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${vybrane.lat},${vybrane.lng}`)}
+                  accessibilityLabel="Navigovať"
                 >
-                  <Text style={styles.actionBtnText}>🧭 Navigovať</Text>
-                </TouchableOpacity>
+                  <Icon name="navigate" size={14} color="#FFFFFF" /><Text style={styles.actionBtnText}>Navigovať</Text>
+                </PressableScale>
                 {vybrane.web && (
-                  <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: t.surfaceAlt, borderWidth: 1, borderColor: t.border }]}
-                    onPress={() => Linking.openURL(vybrane.web!)}
-                  >
-                    <Text style={[styles.actionBtnText, { color: t.text }]}>🌐 Webstránka</Text>
-                  </TouchableOpacity>
+                  <PressableScale style={[styles.actionBtn, { backgroundColor: t.surfaceAlt, borderWidth: 1, borderColor: t.border }]} scaleTo={0.96} onPress={() => Linking.openURL(vybrane.web!)} accessibilityLabel="Webstránka">
+                    <Icon name="globe" size={14} color={t.text} /><Text style={[styles.actionBtnText, { color: t.text }]}>Webstránka</Text>
+                  </PressableScale>
                 )}
               </View>
             </Card>
@@ -323,7 +304,7 @@ export default function OkolieScreen() {
         <View style={{ paddingHorizontal: spacing.lg, marginTop: spacing.lg }}>
           {filtrovane.length === 0 ? (
             <View style={[styles.empty, { backgroundColor: t.surface }]}>
-              <Text style={styles.emptyEmoji}>🔭</Text>
+              <Icon name="search" size={44} color={t.textPlaceholder} style={{ marginBottom: 4 }} />
               <Text style={[styles.emptyTitle, { color: t.text }]}>
                 V rádiuse {radius} km nič nenájdené
               </Text>
@@ -336,40 +317,31 @@ export default function OkolieScreen() {
               const meta = KAT_META[m.kategoria]
               const isSelected = m.id === vybraneId
               return (
-                <TouchableOpacity
+                <PressableScale
                   key={m.id}
                   style={[
                     styles.miestoCard,
                     { backgroundColor: t.surface, shadowColor: t.shadow },
                     isSelected && { borderColor: meta.color, borderWidth: 2 },
                   ]}
-                  activeOpacity={0.85}
+                  scaleTo={0.98}
                   onPress={() => setVybraneId(isSelected ? null : m.id)}
-                  accessibilityRole="button"
                   accessibilityLabel={`${m.nazov}, ${formatVzdialenost(m.vzdialenostKm)} od obce`}
                 >
                   <View style={[styles.miestoIkonaBox, { backgroundColor: meta.color + '22' }]}>
-                    <Text style={styles.miestoEmoji}>{meta.emoji}</Text>
+                    <Icon name={meta.icon} size={24} color={meta.color} />
                   </View>
                   <View style={{ flex: 1, gap: 4 }}>
                     <View style={styles.miestoTop}>
-                      <Text style={[styles.miestoNazov, { color: t.text }]} numberOfLines={1}>
-                        {m.nazov}
-                      </Text>
-                      <Text style={[styles.miestoDist, { color: meta.color }]}>
-                        {formatVzdialenost(m.vzdialenostKm)}
-                      </Text>
+                      <Text style={[styles.miestoNazov, { color: t.text }]} numberOfLines={1}>{m.nazov}</Text>
+                      <Text style={[styles.miestoDist, { color: meta.color }]}>{formatVzdialenost(m.vzdialenostKm)}</Text>
                     </View>
                     {m.podtitul && (
-                      <Text style={[styles.miestoSub, { color: t.textMuted }]} numberOfLines={2}>
-                        {m.podtitul}
-                      </Text>
+                      <Text style={[styles.miestoSub, { color: t.textMuted }]} numberOfLines={2}>{m.podtitul}</Text>
                     )}
                   </View>
-                  <Text style={[styles.chevron, { color: t.textPlaceholder }]}>
-                    {isSelected ? '▾' : '›'}
-                  </Text>
-                </TouchableOpacity>
+                  <Icon name={isSelected ? 'chevronDown' : 'chevron'} size={20} color={t.textPlaceholder} />
+                </PressableScale>
               )
             })
           )}
@@ -389,10 +361,11 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
     gap: 4,
   },
-  back: { alignSelf: 'flex-start' },
-  backText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700', marginBottom: 6 },
+  back: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', marginBottom: 6 },
+  backText: { color: '#FFFFFF', ...typo.bodyB },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   headerTitle: { color: '#FFFFFF', ...typo.h1 },
-  headerSub: { color: 'rgba(255,255,255,0.9)', ...typo.caption, fontWeight: '600' },
+  headerSub: { color: 'rgba(255,255,255,0.9)', ...typo.caption, fontFamily: 'Inter_600SemiBold', marginTop: 2 },
 
   // Rádius
   radiusWrap: {
@@ -439,13 +412,12 @@ const styles = StyleSheet.create({
   },
   detailMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
   distancePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: r.sm,
-    fontSize: 12,
-    fontWeight: '800',
-    overflow: 'hidden',
   },
+  distancePillText: { fontSize: 12, fontFamily: 'Inter_800ExtraBold' },
   detailTitul: { ...typo.h2, marginTop: 6 },
   detailClose: { padding: 4 },
   detailCloseTxt: { fontSize: 22 },
@@ -461,6 +433,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: r.sm,
   },
+  metaPillRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaPillText: { fontSize: 11, fontWeight: '700' },
   actionRow: {
     flexDirection: 'row',
@@ -468,11 +441,12 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   actionBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: spacing.md,
     paddingVertical: 12,
     borderRadius: r.sm,
   },
-  actionBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  actionBtnText: { color: '#FFFFFF', ...typo.captionB },
 
   // Karta miesta
   miestoCard: {

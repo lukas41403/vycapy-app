@@ -1,14 +1,19 @@
 /**
  * Aktuality — news feed s 3 zobrazeniami + vyhľadávanie + filter kategórie.
  *
- *   Search:  TextInput hore, filtruje cez title + perex (case-insensitive)
- *   Filter:  chips s kategóriami pod searchom
- *   View:    list / grid / month toggle
+ *   Search:  TextInput hore (Icon search), filtruje title + perex
+ *   Filter:  chips s kategóriami (farba podľa kategórie)
+ *   View:    list / grid / month toggle (Icon)
+ *
+ * Plne theme-aware, jednotný Icon systém, farebné gradientové placeholdery.
  */
 
 import { AppHeader } from '@/components/AppHeader'
-import { C } from '@/constants/colors'
+import { AnimatedEntrance, AtmosphereBackground, Badge, EmptyState, Icon, IconName, IconTile, PressableScale } from '@/components/ui'
+import { katLabel, katTone, katVisual } from '@/src/config/kategorie'
 import { useAktuality } from '@/src/hooks/useAktuality'
+import { useThemeColors } from '@/src/theme/ThemeContext'
+import { radius, shadows, spacing, typo } from '@/src/theme/tokens'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { useMemo, useState } from 'react'
@@ -16,45 +21,26 @@ import {
   ActivityIndicator,
   FlatList,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native'
-
-const KATEGORIA_FARBY: Record<string, { bg: string; text: string }> = {
-  oznam:     { bg: C.status.info.bg,    text: C.status.info.fg },
-  akcia:     { bg: C.status.success.bg, text: C.status.success.fg },
-  uzavierka: { bg: '#FFF3E0',           text: '#E65100' },
-  vypadok:   { bg: C.status.danger.bg,  text: C.status.danger.fg },
-  sport:     { bg: '#E3F2FD',           text: '#1565C0' },
-  ine:       { bg: '#ECEFF1',           text: '#37474F' },
-}
-
-const KATEGORIA_LABEL: Record<string, string> = {
-  oznam: 'Oznam', akcia: 'Akcia', uzavierka: 'Uzávierka',
-  vypadok: 'Výpadok', sport: 'Šport', ine: 'Iné',
-}
-
-const KATEGORIA_PLACEHOLDER: Record<string, { bg: string; emoji: string }> = {
-  oznam:     { bg: '#90A4AE', emoji: '📋' },
-  akcia:     { bg: '#1B5E20', emoji: '🎉' },
-  uzavierka: { bg: '#C62828', emoji: '🚧' },
-  vypadok:   { bg: '#C62828', emoji: '⚠️' },
-  sport:     { bg: '#1565C0', emoji: '⚽' },
-  ine:       { bg: '#607D8B', emoji: '📰' },
-}
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 const KATEGORIE_FILTER = ['oznam', 'akcia', 'uzavierka', 'vypadok', 'sport', 'ine']
 
 type ViewMode = 'list' | 'grid' | 'month'
 type AktualitaItem = ReturnType<typeof useAktuality>['aktuality'][number]
+const MODES: { id: ViewMode; label: string; icon: IconName }[] = [
+  { id: 'list',  label: 'Zoznam', icon: 'list' },
+  { id: 'grid',  label: 'Grid',   icon: 'grid' },
+  { id: 'month', label: 'Mesiac', icon: 'podujatia' },
+]
 
 export default function AktualityScreen() {
+  const t = useThemeColors()
   const { aktuality, loading, error, refresh } = useAktuality()
   const router = useRouter()
   const [viewMode, setViewMode] = useState<ViewMode>('list')
@@ -68,13 +54,10 @@ export default function AktualityScreen() {
     setRefreshing(false)
   }
 
-  // Filtered podľa searchu + kategórie
   const filtrovane = useMemo(() => {
     const q = search.trim().toLowerCase()
     return aktuality.filter(a => {
-      // Kategória
       if (activeKat && a.kategoria !== activeKat) return false
-      // Search v title + perex
       if (q) {
         const inTitle = a.title?.toLowerCase().includes(q)
         const inPerex = a.perex?.toLowerCase().includes(q)
@@ -84,140 +67,117 @@ export default function AktualityScreen() {
     })
   }, [aktuality, search, activeKat])
 
-  // Zoskupenie podľa mesiaca pre month view
   const podlaMesiaca = useMemo(() => {
-    const grouped = filtrovane.reduce((acc, a) => {
+    return filtrovane.reduce((acc, a) => {
       const mesiac = a.published_at
-        ? new Date(a.published_at).toLocaleDateString('sk-SK', {
-            month: 'long', year: 'numeric',
-          })
+        ? new Date(a.published_at).toLocaleDateString('sk-SK', { month: 'long', year: 'numeric' })
         : 'Bez dátumu'
       const key = mesiac.charAt(0).toUpperCase() + mesiac.slice(1)
       if (!acc[key]) acc[key] = []
       acc[key].push(a)
       return acc
     }, {} as Record<string, AktualitaItem[]>)
-    return grouped
   }, [filtrovane])
 
   const hasFilter = search.trim().length > 0 || activeKat !== null
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={C.surface} />
-
+    <SafeAreaView style={[styles.safe, { backgroundColor: t.background }]} edges={['top']}>
+      <AtmosphereBackground />
       <AppHeader title="Aktuality" subtitle="Čo nové v obci" />
 
-      {/* Search + filter (zobrazí sa po načítaní) */}
       {!loading && !error && aktuality.length > 0 && (
-        <View style={styles.filterWrap}>
-          <View style={styles.searchRow}>
-            <Text style={styles.searchIcon}>🔍</Text>
+        <View style={[styles.filterWrap, { backgroundColor: t.surface, borderBottomColor: t.borderLight }]}>
+          {/* Search */}
+          <View style={[styles.searchRow, { backgroundColor: t.surfaceAlt }]}>
+            <Icon name="search" size={18} color={t.textMuted} />
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, { color: t.text }]}
               value={search}
               onChangeText={setSearch}
-              placeholder="Hľadať v aktualitách..."
-              placeholderTextColor={C.textPlaceholder}
+              placeholder="Hľadať v aktualitách…"
+              placeholderTextColor={t.textPlaceholder}
               returnKeyType="search"
             />
             {search.length > 0 && (
-              <TouchableOpacity
+              <PressableScale
                 onPress={() => setSearch('')}
-                style={styles.searchClear}
+                style={[styles.searchClear, { backgroundColor: t.border }]}
+                scaleTo={0.9}
+                accessibilityLabel="Vymazať hľadanie"
               >
-                <Text style={styles.searchClearText}>✕</Text>
-              </TouchableOpacity>
+                <Icon name="close" size={13} color={t.textSecondary} />
+              </PressableScale>
             )}
           </View>
 
           {/* Kategória chips */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chipsRow}
-          >
-            <TouchableOpacity
-              style={[styles.chip, !activeKat && styles.chipActive]}
-              onPress={() => setActiveKat(null)}
-            >
-              <Text style={[styles.chipText, !activeKat && styles.chipTextActive]}>
-                Všetko
-              </Text>
-            </TouchableOpacity>
-            {KATEGORIE_FILTER.map(k => {
-              const farba = KATEGORIA_FARBY[k]
-              const active = activeKat === k
-              return (
-                <TouchableOpacity
-                  key={k}
-                  style={[
-                    styles.chip,
-                    active && { backgroundColor: farba.bg, borderColor: farba.text },
-                  ]}
-                  onPress={() => setActiveKat(active ? null : k)}
-                >
-                  <Text style={[
-                    styles.chipText,
-                    active && { color: farba.text, fontWeight: '800' },
-                  ]}>
-                    {KATEGORIA_LABEL[k]}
-                  </Text>
-                </TouchableOpacity>
-              )
-            })}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+            <Chip label="Všetko" active={!activeKat} color={t.primary} onPress={() => setActiveKat(null)} />
+            {KATEGORIE_FILTER.map(k => (
+              <Chip
+                key={k}
+                label={katLabel(k)}
+                active={activeKat === k}
+                color={katVisual(k).color}
+                onPress={() => setActiveKat(activeKat === k ? null : k)}
+              />
+            ))}
           </ScrollView>
 
           {/* Mode bar */}
           <View style={styles.modeBar}>
-            <ModeBtn label="☰ Zoznam" active={viewMode === 'list'}  onPress={() => setViewMode('list')} />
-            <ModeBtn label="⊞ Grid"   active={viewMode === 'grid'}  onPress={() => setViewMode('grid')} />
-            <ModeBtn label="📅 Mesiac" active={viewMode === 'month'} onPress={() => setViewMode('month')} />
+            {MODES.map(m => {
+              const active = viewMode === m.id
+              return (
+                <PressableScale
+                  key={m.id}
+                  style={[
+                    styles.modeBtn,
+                    { backgroundColor: t.surfaceAlt, borderColor: 'transparent' },
+                    active && { backgroundColor: t.primaryLight, borderColor: t.primary },
+                  ]}
+                  scaleTo={0.96}
+                  onPress={() => setViewMode(m.id)}
+                  accessibilityLabel={`Zobrazenie: ${m.label}`}
+                >
+                  <Icon name={m.icon} size={15} color={active ? t.primary : t.textMuted} />
+                  <Text style={[styles.modeBtnText, { color: active ? t.primary : t.textMuted }]}>{m.label}</Text>
+                </PressableScale>
+              )
+            })}
           </View>
         </View>
       )}
 
       {loading && (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={C.primary} />
-          <Text style={styles.loadingText}>Načítavam...</Text>
+          <ActivityIndicator size="large" color={t.primary} />
+          <Text style={[styles.loadingText, { color: t.textMuted }]}>Načítavam…</Text>
         </View>
       )}
 
       {error && (
-        <View style={styles.center}>
-          <Text style={styles.errorIcon}>⚠️</Text>
-          <Text style={styles.errorText}>Nepodarilo sa načítať aktuality</Text>
+        <View style={styles.centerPad}>
+          <EmptyState icon="info" title="Nepodarilo sa načítať aktuality" description="Skontrolujte pripojenie a skúste to znova." actionLabel="Skúsiť znova" onAction={handleRefresh} />
         </View>
       )}
 
-      {/* Žiadne výsledky */}
       {!loading && !error && aktuality.length > 0 && filtrovane.length === 0 && (
-        <View style={styles.empty}>
-          <Text style={styles.emptyIcon}>🔍</Text>
-          <Text style={styles.emptyTitle}>Nič sa nenašlo</Text>
-          <Text style={styles.emptyText}>
-            Skús zmeniť hľadaný výraz alebo zrušiť filter kategórie.
-          </Text>
-          {hasFilter && (
-            <TouchableOpacity
-              style={styles.resetBtn}
-              onPress={() => { setSearch(''); setActiveKat(null) }}
-            >
-              <Text style={styles.resetBtnText}>Zrušiť filter</Text>
-            </TouchableOpacity>
-          )}
+        <View style={styles.centerPad}>
+          <EmptyState
+            icon="search"
+            title="Nič sa nenašlo"
+            description="Skús zmeniť hľadaný výraz alebo zrušiť filter kategórie."
+            actionLabel={hasFilter ? 'Zrušiť filter' : undefined}
+            onAction={hasFilter ? () => { setSearch(''); setActiveKat(null) } : undefined}
+          />
         </View>
       )}
 
-      {/* Žiadne aktuality vôbec */}
       {!loading && !error && aktuality.length === 0 && (
-        <View style={styles.empty}>
-          <Text style={styles.emptyIcon}>📭</Text>
-          <Text style={styles.emptyTitle}>Žiadne aktuality</Text>
-          <Text style={styles.emptyText}>
-            Momentálne nie sú zverejnené žiadne aktuality. Pozrite sa neskôr.
-          </Text>
+        <View style={styles.centerPad}>
+          <EmptyState icon="aktuality" title="Žiadne aktuality" description="Momentálne nie sú zverejnené žiadne aktuality. Pozrite sa neskôr." />
         </View>
       )}
 
@@ -225,13 +185,11 @@ export default function AktualityScreen() {
       {!loading && !error && filtrovane.length > 0 && viewMode === 'list' && (
         <FlatList
           data={filtrovane}
-          keyExtractor={(item) => item.id}
+          keyExtractor={item => item.id}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.primary} />
-          }
-          renderItem={({ item }) => <ListCard item={item} router={router} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={t.primary} />}
+          renderItem={({ item }) => <ListCard item={item} onPress={() => router.push(`/aktualita/${item.id}` as never)} />}
         />
       )}
 
@@ -239,15 +197,13 @@ export default function AktualityScreen() {
       {!loading && !error && filtrovane.length > 0 && viewMode === 'grid' && (
         <FlatList
           data={filtrovane}
-          keyExtractor={(item) => item.id}
+          keyExtractor={item => item.id}
           contentContainerStyle={styles.gridContent}
-          columnWrapperStyle={{ gap: 12 }}
+          columnWrapperStyle={{ gap: spacing.md }}
           numColumns={2}
           showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.primary} />
-          }
-          renderItem={({ item }) => <GridCard item={item} router={router} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={t.primary} />}
+          renderItem={({ item }) => <GridCard item={item} onPress={() => router.push(`/aktualita/${item.id}` as never)} />}
         />
       )}
 
@@ -256,18 +212,18 @@ export default function AktualityScreen() {
         <ScrollView
           contentContainerStyle={styles.monthScroll}
           showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.primary} />
-          }
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={t.primary} />}
         >
           {Object.entries(podlaMesiaca).map(([mesiac, items]) => (
             <View key={mesiac} style={styles.monthGroup}>
               <View style={styles.monthHeader}>
-                <View style={styles.monthLine} />
-                <Text style={styles.monthLabel}>{mesiac}</Text>
-                <View style={styles.monthLine} />
+                <View style={[styles.monthLine, { backgroundColor: t.border }]} />
+                <Text style={[styles.monthLabel, { color: t.textMuted }]}>{mesiac}</Text>
+                <View style={[styles.monthLine, { backgroundColor: t.border }]} />
               </View>
-              {items.map(item => <ListCard key={item.id} item={item} router={router} />)}
+              {items.map(item => (
+                <ListCard key={item.id} item={item} onPress={() => router.push(`/aktualita/${item.id}` as never)} />
+              ))}
             </View>
           ))}
         </ScrollView>
@@ -276,287 +232,123 @@ export default function AktualityScreen() {
   )
 }
 
-// ─── Mode button ────────────────────────────────────────────────────────────
-function ModeBtn({ label, active, onPress }: {
-  label: string
-  active: boolean
-  onPress: () => void
-}) {
+// ─── Chip ─────────────────────────────────────────────────────────────────
+function Chip({ label, active, color, onPress }: { label: string; active: boolean; color: string; onPress: () => void }) {
+  const t = useThemeColors()
   return (
-    <TouchableOpacity
-      style={[styles.modeBtn, active && styles.modeBtnActive]}
+    <PressableScale
+      style={[
+        styles.chip,
+        { backgroundColor: t.surface, borderColor: t.border },
+        active && { backgroundColor: color + '1A', borderColor: color },
+      ]}
+      scaleTo={0.95}
       onPress={onPress}
-      activeOpacity={0.7}
+      accessibilityLabel={label}
     >
-      <Text style={[styles.modeBtnText, active && styles.modeBtnTextActive]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
+      <Text style={[styles.chipText, { color: active ? color : t.textSecondary }]}>{label}</Text>
+    </PressableScale>
   )
 }
 
-// ─── List card (default) ────────────────────────────────────────────────────
-function ListCard({ item, router }: { item: AktualitaItem; router: any }) {
-  const kat = KATEGORIA_FARBY[item.kategoria] ?? KATEGORIA_FARBY.ine
-  const placeholder = KATEGORIA_PLACEHOLDER[item.kategoria] ?? KATEGORIA_PLACEHOLDER.ine
+// ─── List card ──────────────────────────────────────────────────────────────
+function ListCard({ item, onPress }: { item: AktualitaItem; onPress: () => void }) {
+  const t = useThemeColors()
+  const vis = katVisual(item.kategoria)
   return (
-    <TouchableOpacity
-      style={styles.card}
-      activeOpacity={0.85}
-      onPress={() => router.push(`/aktualita/${item.id}`)}
-    >
+    <AnimatedEntrance>
+    <PressableScale style={[styles.card, { backgroundColor: t.surface, shadowColor: t.shadow }]} onPress={onPress} accessibilityLabel={item.title}>
       {item.cover_url ? (
-        <Image
-          source={{ uri: item.cover_url }}
-          style={styles.cover}
-          contentFit="cover"
-          transition={250}
-        />
+        <Image source={{ uri: item.cover_url }} style={styles.cover} contentFit="cover" transition={250} />
       ) : (
-        <View style={[styles.coverPlaceholder, { backgroundColor: placeholder.bg }]}>
-          <Text style={styles.coverEmoji}>{placeholder.emoji}</Text>
-        </View>
+        <IconTile name={vis.icon} gradient={vis.gradient} cornerRadius={0} style={styles.coverPlaceholder} iconSize={56} />
       )}
       <View style={styles.cardBody}>
         <View style={styles.cardTop}>
-          <View style={[styles.badge, { backgroundColor: kat.bg }]}>
-            <Text style={[styles.badgeText, { color: kat.text }]}>
-              {KATEGORIA_LABEL[item.kategoria] ?? item.kategoria}
-            </Text>
-          </View>
-          <Text style={styles.datum}>
-            {item.published_at
-              ? new Date(item.published_at).toLocaleDateString('sk-SK', {
-                  day: 'numeric', month: 'long', year: 'numeric',
-                })
-              : ''}
+          <Badge label={katLabel(item.kategoria)} tone={katTone(item.kategoria)} />
+          <Text style={[styles.datum, { color: t.textPlaceholder }]}>
+            {item.published_at ? new Date(item.published_at).toLocaleDateString('sk-SK', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}
           </Text>
         </View>
-        <Text style={styles.cardTitle}>{item.title}</Text>
-        {item.perex && (
-          <Text style={styles.cardPerex} numberOfLines={2}>{item.perex}</Text>
-        )}
-        <View style={styles.cardFooter}>
-          <Text style={styles.readMore}>Čítať viac →</Text>
+        <Text style={[styles.cardTitle, { color: t.text }]}>{item.title}</Text>
+        {item.perex && <Text style={[styles.cardPerex, { color: t.textSecondary }]} numberOfLines={2}>{item.perex}</Text>}
+        <View style={[styles.cardFooter, { borderTopColor: t.divider }]}>
+          <Text style={[styles.readMore, { color: t.primary }]}>Čítať viac</Text>
+          <Icon name="arrowRight" size={14} color={t.primary} />
         </View>
       </View>
-    </TouchableOpacity>
+    </PressableScale>
+    </AnimatedEntrance>
   )
 }
 
-// ─── Grid card (2 stĺpce) ───────────────────────────────────────────────────
-function GridCard({ item, router }: { item: AktualitaItem; router: any }) {
-  const kat = KATEGORIA_FARBY[item.kategoria] ?? KATEGORIA_FARBY.ine
-  const placeholder = KATEGORIA_PLACEHOLDER[item.kategoria] ?? KATEGORIA_PLACEHOLDER.ine
+// ─── Grid card ────────────────────────────────────────────────────────────
+function GridCard({ item, onPress }: { item: AktualitaItem; onPress: () => void }) {
+  const t = useThemeColors()
+  const vis = katVisual(item.kategoria)
   return (
-    <TouchableOpacity
-      style={styles.gridCard}
-      activeOpacity={0.85}
-      onPress={() => router.push(`/aktualita/${item.id}`)}
-    >
+    <PressableScale style={[styles.gridCard, { backgroundColor: t.surface, shadowColor: t.shadow }]} onPress={onPress} accessibilityLabel={item.title}>
       {item.cover_url ? (
-        <Image
-          source={{ uri: item.cover_url }}
-          style={styles.gridCover}
-          contentFit="cover"
-          transition={250}
-        />
+        <Image source={{ uri: item.cover_url }} style={styles.gridCover} contentFit="cover" transition={250} />
       ) : (
-        <View style={[styles.gridCover, { backgroundColor: placeholder.bg, justifyContent: 'center', alignItems: 'center' }]}>
-          <Text style={{ fontSize: 36, opacity: 0.9 }}>{placeholder.emoji}</Text>
-        </View>
+        <IconTile name={vis.icon} gradient={vis.gradient} cornerRadius={0} style={styles.gridCover} iconSize={40} />
       )}
       <View style={styles.gridBody}>
-        <View style={[styles.gridBadge, { backgroundColor: kat.bg }]}>
-          <Text style={[styles.gridBadgeText, { color: kat.text }]}>
-            {KATEGORIA_LABEL[item.kategoria] ?? item.kategoria}
-          </Text>
-        </View>
-        <Text style={styles.gridTitle} numberOfLines={3}>{item.title}</Text>
+        <Badge label={katLabel(item.kategoria)} tone={katTone(item.kategoria)} />
+        <Text style={[styles.gridTitle, { color: t.text }]} numberOfLines={3}>{item.title}</Text>
       </View>
-    </TouchableOpacity>
+    </PressableScale>
   )
 }
 
 // ─── Štýly ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.background },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8 },
-  loadingText: { color: C.textMuted, fontSize: 14, marginTop: 8 },
-  errorIcon: { fontSize: 36 },
-  errorText: { color: '#C62828', fontSize: 15 },
+  safe: { flex: 1 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.sm },
+  centerPad: { flex: 1, justifyContent: 'center' },
+  loadingText: { ...typo.caption, marginTop: spacing.sm },
 
-  empty: {
-    flex: 1, justifyContent: 'center', alignItems: 'center',
-    paddingHorizontal: 40, gap: 8,
-  },
-  emptyIcon: { fontSize: 56, marginBottom: 8 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: C.text },
-  emptyText: {
-    fontSize: 14, color: C.textMuted, textAlign: 'center',
-    lineHeight: 20, marginTop: 4,
-  },
-  resetBtn: {
-    marginTop: 16,
-    backgroundColor: C.primary,
-    paddingHorizontal: 24, paddingVertical: 10,
-    borderRadius: 10,
-  },
-  resetBtnText: { color: C.onPrimary, fontWeight: '700', fontSize: 14 },
-
-  // Filter wrap
-  filterWrap: {
-    backgroundColor: C.surface,
-    borderBottomWidth: 1, borderBottomColor: C.borderLight,
-  },
-
-  // Search
+  filterWrap: { borderBottomWidth: 1 },
   searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 16,
-    marginTop: 12,
-    backgroundColor: C.surfaceAlt,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 42,
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    marginHorizontal: spacing.lg, marginTop: spacing.md,
+    borderRadius: radius.md, paddingHorizontal: spacing.md, height: 44,
   },
-  searchIcon: { fontSize: 16, marginRight: 8 },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: C.text,
-    height: '100%',
-  },
-  searchClear: {
-    width: 24, height: 24, borderRadius: 12,
-    backgroundColor: C.border,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  searchClearText: { color: C.textSecondary, fontSize: 12, fontWeight: '800' },
+  searchInput: { flex: 1, fontSize: 14, height: '100%' },
+  searchClear: { width: 22, height: 22, borderRadius: 11, justifyContent: 'center', alignItems: 'center' },
 
-  // Chips
-  chipsRow: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 8,
-  },
-  chip: {
-    paddingHorizontal: 12, paddingVertical: 6,
-    backgroundColor: C.surface,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: C.border,
-  },
-  chipActive: {
-    backgroundColor: C.primaryLight,
-    borderColor: C.primary,
-  },
-  chipText: { fontSize: 12, fontWeight: '700', color: C.textSecondary },
-  chipTextActive: { color: C.primary },
+  chipsRow: { paddingHorizontal: spacing.md, paddingVertical: spacing.md, gap: spacing.sm },
+  chip: { paddingHorizontal: spacing.md, paddingVertical: 7, borderRadius: radius.pill, borderWidth: 1.5 },
+  chipText: { fontSize: 12, fontWeight: '700' },
 
-  // Mode bar
-  modeBar: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingBottom: 10,
-    gap: 8,
-  },
+  modeBar: { flexDirection: 'row', paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.sm },
   modeBtn: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    borderRadius: 8,
-    backgroundColor: C.surfaceAlt,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'transparent',
+    flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5,
+    paddingVertical: spacing.sm, borderRadius: radius.sm, borderWidth: 1,
   },
-  modeBtnActive: {
-    backgroundColor: C.primaryLight,
-    borderColor: C.primary,
-  },
-  modeBtnText: { fontSize: 12, fontWeight: '700', color: C.textMuted },
-  modeBtnTextActive: { color: C.primary },
+  modeBtnText: { fontSize: 12, fontWeight: '700' },
 
-  // LIST
-  list: { padding: 16, gap: 16 },
-  card: {
-    backgroundColor: C.surface,
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: C.shadow,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 4,
-    marginBottom: 16,
-  },
-  cover: { width: '100%', height: 200, backgroundColor: C.surfaceAlt },
-  coverPlaceholder: {
-    width: '100%', height: 200,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  coverEmoji: { fontSize: 72, opacity: 0.9 },
+  list: { padding: spacing.lg, gap: spacing.lg },
+  card: { borderRadius: radius.lg, overflow: 'hidden', marginBottom: spacing.lg, ...shadows.md },
+  cover: { width: '100%', height: 190 },
+  coverPlaceholder: { width: '100%', height: 190, borderRadius: 0 },
+  cardBody: { padding: spacing.lg },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
+  datum: { ...typo.caption },
+  cardTitle: { ...typo.h2, marginBottom: 6 },
+  cardPerex: { ...typo.body, marginBottom: spacing.md },
+  cardFooter: { flexDirection: 'row', alignItems: 'center', gap: 5, borderTopWidth: 1, paddingTop: spacing.md },
+  readMore: { ...typo.captionB },
 
-  cardBody: { padding: 16 },
-  cardTop: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 10,
-  },
-  badge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-  badgeText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.3 },
-  datum: { fontSize: 12, color: C.textPlaceholder },
+  gridContent: { padding: spacing.lg, gap: spacing.md },
+  gridCard: { flex: 1, borderRadius: radius.lg, overflow: 'hidden', ...shadows.sm },
+  gridCover: { width: '100%', height: 110, borderRadius: 0 },
+  gridBody: { padding: spacing.md, gap: 6 },
+  gridTitle: { ...typo.captionB, fontSize: 13, lineHeight: 17 },
 
-  cardTitle: {
-    fontSize: 18, fontWeight: '800', color: C.text,
-    lineHeight: 24, marginBottom: 6, letterSpacing: -0.2,
-  },
-  cardPerex: { fontSize: 14, color: C.textSecondary, lineHeight: 20, marginBottom: 12 },
-  cardFooter: { borderTopWidth: 1, borderTopColor: C.divider, paddingTop: 10 },
-  readMore: { fontSize: 13, fontWeight: '700', color: C.primary },
-
-  // GRID
-  gridContent: { padding: 16, gap: 12 },
-  gridCard: {
-    flex: 1,
-    backgroundColor: C.surface,
-    borderRadius: 14,
-    overflow: 'hidden',
-    shadowColor: C.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  gridCover: { width: '100%', height: 110, backgroundColor: C.surfaceAlt },
-  gridBody: { padding: 10, gap: 6 },
-  gridBadge: {
-    alignSelf: 'flex-start',
-    borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
-  },
-  gridBadgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
-  gridTitle: {
-    fontSize: 13, fontWeight: '700', color: C.text,
-    lineHeight: 17,
-  },
-
-  // MONTH
-  monthScroll: { padding: 16, paddingBottom: 24 },
-  monthGroup: { marginBottom: 8 },
-  monthHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 12,
-    marginTop: 4,
-  },
-  monthLine: { flex: 1, height: 1, backgroundColor: C.border },
-  monthLabel: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: C.textMuted,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
+  monthScroll: { padding: spacing.lg, paddingBottom: spacing.xl },
+  monthGroup: { marginBottom: spacing.sm },
+  monthHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md, marginTop: 4 },
+  monthLine: { flex: 1, height: 1 },
+  monthLabel: { ...typo.label },
 })

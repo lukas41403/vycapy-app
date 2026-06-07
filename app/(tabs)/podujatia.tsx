@@ -1,38 +1,40 @@
 import { AppHeader } from '@/components/AppHeader'
+import { AnimatedEntrance, AtmosphereBackground, EmptyState, Icon, IconName, IconTile, PressableScale } from '@/components/ui'
 import { C } from '@/constants/colors'
 import { usePodujatia } from '@/src/hooks/usePodujatia'
+import { ThemeColors, useThemeColors } from '@/src/theme/ThemeContext'
+import { radius, shadows, spacing, typo } from '@/src/theme/tokens'
 import { useRouter } from 'expo-router'
-import {
-    ActivityIndicator, RefreshControl, SafeAreaView, ScrollView,
-    StatusBar, StyleSheet, Text, TouchableOpacity, View,
-} from 'react-native'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
-const KATEGORIA_CONFIG: Record<string, { emoji: string; farba: string; label: string }> = {
-  kultura:  { emoji: '🎭', farba: '#6A1B9A',     label: 'Kultúra' },
-  sport:    { emoji: '⚽', farba: '#1565C0',     label: 'Šport' },
-  slavnost: { emoji: '🎉', farba: C.brand.gold,  label: 'Slávnosť' },
-  kino:     { emoji: '🎬', farba: C.brand.green, label: 'Kino' },
-  divadlo:  { emoji: '🎪', farba: '#880E4F',     label: 'Divadlo' },
-  deti:     { emoji: '🎈', farba: '#F57F17',     label: 'Pre deti' },
-  ine:      { emoji: '📅', farba: '#37474F',     label: 'Iné' },
+type KatCfg = { icon: IconName; gradient: readonly [string, string, ...string[]]; label: string }
+const KATEGORIA_CONFIG: Record<string, KatCfg> = {
+  kultura:  { icon: 'music',     gradient: C.gradients.purple, label: 'Kultúra' },
+  sport:    { icon: 'fc',        gradient: C.gradients.blue,   label: 'Šport' },
+  slavnost: { icon: 'sparkles',  gradient: C.gradients.gold,   label: 'Slávnosť' },
+  kino:     { icon: 'film',      gradient: C.gradients.indigo, label: 'Kino' },
+  divadlo:  { icon: 'theater',   gradient: C.gradients.pink,   label: 'Divadlo' },
+  deti:     { icon: 'happy',     gradient: C.gradients.orange, label: 'Pre deti' },
+  ine:      { icon: 'podujatia', gradient: C.gradients.slate,  label: 'Iné' },
 }
+const katCfg = (k: string): KatCfg => KATEGORIA_CONFIG[k] ?? KATEGORIA_CONFIG.ine
 
-function formatDatum(datum_od: string, _datum_do: string | null) {
+function formatDatum(datum_od: string) {
   const od = new Date(datum_od)
   const den = od.toLocaleDateString('sk-SK', { weekday: 'long', day: 'numeric', month: 'long' })
   const cas = od.toLocaleTimeString('sk-SK', { hour: '2-digit', minute: '2-digit' })
   return { den: den.charAt(0).toUpperCase() + den.slice(1), cas }
 }
-
 function jeBlizko(datum: string) {
-  const d = new Date(datum)
-  const dnes = new Date()
-  const diff = (d.getTime() - dnes.getTime()) / (1000 * 60 * 60 * 24)
+  const diff = (new Date(datum).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
   return diff <= 7
 }
 
 export default function PodujatiaScreen() {
+  const t = useThemeColors()
+  const styles = useMemo(() => makeStyles(t), [t])
   const { podujatia, loading, error, refresh } = usePodujatia()
   const router = useRouter()
   const [refreshing, setRefreshing] = useState(false)
@@ -44,32 +46,26 @@ export default function PodujatiaScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={C.surface} />
-
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <AtmosphereBackground />
       <AppHeader title="Podujatia" subtitle="Kalendár obecných akcií" />
 
       {loading && (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={C.primary} />
-          <Text style={styles.loadingText}>Načítavam...</Text>
+          <ActivityIndicator size="large" color={t.primary} />
+          <Text style={styles.loadingText}>Načítavam…</Text>
         </View>
       )}
 
       {error && (
-        <View style={styles.center}>
-          <Text style={styles.errorIcon}>⚠️</Text>
-          <Text style={styles.errorText}>Chyba pri načítaní</Text>
+        <View style={styles.centerPad}>
+          <EmptyState icon="info" title="Chyba pri načítaní" description="Skontrolujte pripojenie a skúste znova." actionLabel="Skúsiť znova" onAction={handleRefresh} />
         </View>
       )}
 
       {!loading && !error && podujatia.length === 0 && (
-        <View style={styles.empty}>
-          <Text style={styles.emptyIcon}>📅</Text>
-          <Text style={styles.emptyTitle}>Žiadne nadchádzajúce podujatia</Text>
-          <Text style={styles.emptyText}>
-            Aktuálne nie sú v kalendári žiadne podujatia. Skontrolujte neskôr.
-          </Text>
+        <View style={styles.centerPad}>
+          <EmptyState icon="podujatia" title="Žiadne nadchádzajúce podujatia" description="Aktuálne nie sú v kalendári žiadne podujatia. Skontrolujte neskôr." />
         </View>
       )}
 
@@ -77,63 +73,43 @@ export default function PodujatiaScreen() {
         <ScrollView
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.primary} />
-          }
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={t.primary} />}
         >
           {podujatia.map(p => {
-            const kat = KATEGORIA_CONFIG[p.kategoria] ?? KATEGORIA_CONFIG.ine
-            const { den, cas } = formatDatum(p.datum_od, p.datum_do)
+            const kat = katCfg(p.kategoria)
+            const { den, cas } = formatDatum(p.datum_od)
             const blizko = jeBlizko(p.datum_od)
-
             return (
-              <TouchableOpacity
-                key={p.id}
-                style={styles.karta}
-                activeOpacity={0.75}
-                onPress={() => router.push(`/podujatie/${p.id}`)}
-              >
-                {blizko && (
-                  <View style={styles.blizkoTag}>
-                    <Text style={styles.blizkoText}>Tento týždeň</Text>
-                  </View>
-                )}
-                <View style={styles.kartaTop}>
-                  <View style={[styles.emojiBox, { backgroundColor: kat.farba + '18' }]}>
-                    <Text style={styles.emoji}>{kat.emoji}</Text>
-                  </View>
-                  <View style={styles.kartaInfo}>
-                    <View style={[styles.katBadge, { backgroundColor: kat.farba + '18' }]}>
-                      <Text style={[styles.katLabel, { color: kat.farba }]}>{kat.label}</Text>
-                    </View>
-                    <Text style={styles.kartaTitle}>{p.title}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.detaily}>
-                  <View style={styles.detail}>
-                    <Text style={styles.detailIcon}>📅</Text>
-                    <Text style={styles.detailText}>{den}</Text>
-                  </View>
-                  <View style={styles.detail}>
-                    <Text style={styles.detailIcon}>⏰</Text>
-                    <Text style={styles.detailText}>{cas}</Text>
-                  </View>
-                  {p.miesto && (
-                    <View style={styles.detail}>
-                      <Text style={styles.detailIcon}>📍</Text>
-                      <Text style={styles.detailText}>{p.miesto}</Text>
+              <AnimatedEntrance key={p.id}>
+                <PressableScale style={styles.karta} onPress={() => router.push(`/podujatie/${p.id}` as never)} accessibilityLabel={p.title}>
+                  {blizko && (
+                    <View style={styles.blizkoTag}>
+                      <Text style={styles.blizkoText}>Tento týždeň</Text>
                     </View>
                   )}
-                </View>
+                  <View style={styles.kartaTop}>
+                    <IconTile name={kat.icon} gradient={kat.gradient} size={52} iconSize={26} glow />
+                    <View style={styles.kartaInfo}>
+                      <View style={[styles.katBadge, { backgroundColor: kat.gradient[kat.gradient.length - 1] + '1A' }]}>
+                        <Text style={[styles.katLabel, { color: kat.gradient[kat.gradient.length - 1] }]}>{kat.label}</Text>
+                      </View>
+                      <Text style={styles.kartaTitle}>{p.title}</Text>
+                    </View>
+                  </View>
 
-                {p.popis && (
-                  <Text style={styles.popis} numberOfLines={2}>{p.popis}</Text>
-                )}
-                <View style={styles.cardFooter}>
-                  <Text style={[styles.readMore, { color: kat.farba }]}>Detail podujatia →</Text>
-                </View>
-              </TouchableOpacity>
+                  <View style={styles.detaily}>
+                    <View style={styles.detail}><Icon name="podujatia" size={14} color={t.textMuted} /><Text style={styles.detailText}>{den}</Text></View>
+                    <View style={styles.detail}><Icon name="time" size={14} color={t.textMuted} /><Text style={styles.detailText}>{cas}</Text></View>
+                    {p.miesto && <View style={styles.detail}><Icon name="location" size={14} color={t.textMuted} /><Text style={styles.detailText}>{p.miesto}</Text></View>}
+                  </View>
+
+                  {p.popis && <Text style={styles.popis} numberOfLines={2}>{p.popis}</Text>}
+                  <View style={styles.cardFooter}>
+                    <Text style={[styles.readMore, { color: kat.gradient[kat.gradient.length - 1] }]}>Detail podujatia</Text>
+                    <Icon name="arrowRight" size={14} color={kat.gradient[kat.gradient.length - 1]} />
+                  </View>
+                </PressableScale>
+              </AnimatedEntrance>
             )
           })}
         </ScrollView>
@@ -142,60 +118,25 @@ export default function PodujatiaScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.background },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8 },
-  loadingText: { color: C.textMuted, fontSize: 14, marginTop: 8 },
-  errorIcon: { fontSize: 36 },
-  errorText: { color: C.brand.red, fontSize: 15 },
+const makeStyles = (t: ThemeColors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: t.background },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.sm },
+  centerPad: { flex: 1, justifyContent: 'center' },
+  loadingText: { ...typo.caption, color: t.textMuted, marginTop: spacing.sm },
 
-  empty: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-    gap: 8,
-  },
-  emptyIcon: { fontSize: 56, marginBottom: 8 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: C.text },
-  emptyText: {
-    fontSize: 14,
-    color: C.textMuted,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginTop: 4,
-  },
-
-  list: { padding: 16, gap: 12 },
-  karta: {
-    backgroundColor: C.surface, borderRadius: 16, padding: 16,
-    shadowColor: C.shadow, shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
-    overflow: 'hidden',
-  },
-  blizkoTag: {
-    position: 'absolute', top: 0, right: 0,
-    backgroundColor: C.accent, borderBottomLeftRadius: 12,
-    paddingHorizontal: 10, paddingVertical: 4,
-  },
-  blizkoText: { color: C.brand.redDark, fontSize: 10, fontWeight: '800', letterSpacing: 0.3 },
-  kartaTop: { flexDirection: 'row', gap: 12, marginBottom: 12, alignItems: 'flex-start' },
-  emojiBox: { width: 52, height: 52, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  emoji: { fontSize: 26 },
+  list: { padding: spacing.lg, gap: spacing.md },
+  karta: { backgroundColor: t.surface, borderRadius: radius.lg, padding: spacing.lg, overflow: 'hidden', ...shadows.md, shadowColor: t.shadow },
+  blizkoTag: { position: 'absolute', top: 0, right: 0, backgroundColor: t.accent, borderBottomLeftRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 4 },
+  blizkoText: { color: C.brand.redDark, fontSize: 10, fontFamily: 'Inter_800ExtraBold', letterSpacing: 0.3 },
+  kartaTop: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md, alignItems: 'flex-start' },
   kartaInfo: { flex: 1, gap: 6 },
-  katBadge: { alignSelf: 'flex-start', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  katLabel: { fontSize: 11, fontWeight: '700' },
-  kartaTitle: { fontSize: 16, fontWeight: '700', color: C.text, lineHeight: 22 },
-  detaily: { gap: 4, marginBottom: 8 },
+  katBadge: { alignSelf: 'flex-start', borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 3 },
+  katLabel: { ...typo.micro, fontFamily: 'Inter_800ExtraBold' },
+  kartaTitle: { ...typo.h3, color: t.text },
+  detaily: { gap: 5, marginBottom: spacing.sm },
   detail: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  detailIcon: { fontSize: 13 },
-  detailText: { fontSize: 13, color: C.textSecondary },
-  popis: { fontSize: 13, color: C.textMuted, lineHeight: 19, marginTop: 4 },
-  cardFooter: {
-    borderTopWidth: 1,
-    borderTopColor: C.divider,
-    paddingTop: 10,
-    marginTop: 10,
-  },
-  readMore: { fontSize: 13, fontWeight: '700' },
+  detailText: { ...typo.caption, color: t.textSecondary },
+  popis: { ...typo.caption, color: t.textMuted, lineHeight: 19, marginTop: 4 },
+  cardFooter: { flexDirection: 'row', alignItems: 'center', gap: 5, borderTopWidth: 1, borderTopColor: t.divider, paddingTop: spacing.md, marginTop: spacing.md },
+  readMore: { ...typo.captionB },
 })

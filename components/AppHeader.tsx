@@ -13,6 +13,8 @@
  */
 
 import { C } from '@/constants/colors'
+import { useThemeColors } from '@/src/theme/ThemeContext'
+import { fonts } from '@/src/theme/tokens'
 import { useState } from 'react'
 import { Image, StyleSheet, Text, View, ViewStyle } from 'react-native'
 
@@ -43,13 +45,16 @@ export function AppHeader({
   showBrandRow = false,
   style,
 }: Props) {
+  const t = useThemeColors()
   const isBrand = variant === 'brand'
 
   return (
     <View
       style={[
         styles.header,
-        isBrand ? styles.headerBrand : styles.headerPlain,
+        isBrand
+          ? { backgroundColor: t.primary, paddingBottom: 24 }
+          : { backgroundColor: t.surface, borderBottomWidth: 1, borderBottomColor: t.borderLight },
         style,
       ]}
     >
@@ -60,7 +65,7 @@ export function AppHeader({
             <Text
               style={[
                 styles.brandTitle,
-                isBrand ? styles.brandTitleBrand : styles.brandTitlePlain,
+                isBrand ? styles.brandTitleBrand : { color: t.text },
               ]}
               numberOfLines={1}
             >
@@ -69,7 +74,7 @@ export function AppHeader({
             <Text
               style={[
                 styles.brandSub,
-                isBrand ? styles.brandSubBrand : styles.brandSubPlain,
+                isBrand ? styles.brandSubBrand : { color: t.textMuted },
               ]}
             >
               Obecná aplikácia
@@ -81,7 +86,7 @@ export function AppHeader({
       <Text
         style={[
           styles.sectionTitle,
-          isBrand ? styles.sectionTitleBrand : styles.sectionTitlePlain,
+          isBrand ? styles.sectionTitleBrand : { color: t.text },
         ]}
       >
         {title}
@@ -90,7 +95,7 @@ export function AppHeader({
         <Text
           style={[
             styles.sectionSub,
-            isBrand ? styles.sectionSubBrand : styles.sectionSubPlain,
+            isBrand ? styles.sectionSubBrand : { color: t.textMuted },
           ]}
         >
           {subtitle}
@@ -220,8 +225,8 @@ const styles = StyleSheet.create({
   brandSubPlain: { color: C.textMuted },
 
   sectionTitle: {
-    fontSize: 26,
-    fontWeight: '800',
+    fontSize: 28,
+    fontFamily: fonts.display,
     letterSpacing: -0.5,
   },
   sectionTitleBrand: { color: C.onPrimary },

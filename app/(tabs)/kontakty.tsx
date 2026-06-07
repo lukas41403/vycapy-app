@@ -1,54 +1,19 @@
 import { AppHeader } from '@/components/AppHeader'
+import { AnimatedEntrance, AtmosphereBackground, Icon, IconTile, PressableScale } from '@/components/ui'
 import { C } from '@/constants/colors'
-import {
-    Linking, SafeAreaView, ScrollView,
-    StatusBar, StyleSheet, Text,
-    TouchableOpacity, View,
-} from 'react-native'
+import { ThemeColors, useThemeColors } from '@/src/theme/ThemeContext'
+import { radius, shadows, spacing, typo } from '@/src/theme/tokens'
+import { useMemo } from 'react'
+import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 const KONTAKTY = [
-  {
-    meno: 'Ing. Jozef Holúbek',
-    funkcia: 'Starosta obce',
-    telefon: '0907 167 383',
-    email: 'starosta@vycapy-opatovce.sk',
-    emoji: '👨‍💼',
-  },
-  {
-    meno: 'Ing. Jarmila Bernátová',
-    funkcia: 'Prednostka obecného úradu',
-    telefon: '0908 726 873',
-    email: 'jarmila.bernatova@vycapy-opatovce.sk',
-    emoji: '👩‍💼',
-  },
-  {
-    meno: 'Bc. Dáša Dávidová',
-    funkcia: 'Účtovníčka obce',
-    telefon: '0904 617 009',
-    email: 'dasa.davidova@vycapy-opatovce.sk',
-    emoji: '👩‍💼',
-  },
-  {
-    meno: 'Ing. Lucia Augustíneková',
-    funkcia: 'Referentka',
-    telefon: '037 / 77 951 51',
-    email: 'lucia.augustinekova@vycapy-opatovce.sk',
-    emoji: '👩‍💼',
-  },
-  {
-    meno: 'Mgr. Lujza Balková',
-    funkcia: 'Referentka',
-    telefon: '037 / 77 951 51',
-    email: 'lujza.balkova@vycapy-opatovce.sk',
-    emoji: '👩‍💼',
-  },
-  {
-    meno: 'Ing. Mária Pekárová',
-    funkcia: 'Hlavný kontrolór obce',
-    telefon: null,
-    email: 'hlavnykontrolor@vycapy-opatovce.sk',
-    emoji: '👩‍💼',
-  },
+  { meno: 'Ing. Jozef Holúbek',      funkcia: 'Starosta obce',                telefon: '0907 167 383',     email: 'starosta@vycapy-opatovce.sk',           gradient: C.gradients.gold },
+  { meno: 'Ing. Jarmila Bernátová',  funkcia: 'Prednostka obecného úradu',    telefon: '0908 726 873',     email: 'jarmila.bernatova@vycapy-opatovce.sk',  gradient: C.gradients.blue },
+  { meno: 'Bc. Dáša Dávidová',       funkcia: 'Účtovníčka obce',              telefon: '0904 617 009',     email: 'dasa.davidova@vycapy-opatovce.sk',      gradient: C.gradients.teal },
+  { meno: 'Ing. Lucia Augustíneková',funkcia: 'Referentka',                   telefon: '037 / 77 951 51',  email: 'lucia.augustinekova@vycapy-opatovce.sk',gradient: C.gradients.purple },
+  { meno: 'Mgr. Lujza Balková',      funkcia: 'Referentka',                   telefon: '037 / 77 951 51',  email: 'lujza.balkova@vycapy-opatovce.sk',      gradient: C.gradients.indigo },
+  { meno: 'Ing. Mária Pekárová',     funkcia: 'Hlavný kontrolór obce',        telefon: null,               email: 'hlavnykontrolor@vycapy-opatovce.sk',    gradient: C.gradients.slate },
 ]
 
 const URADNE_HODINY = [
@@ -60,73 +25,67 @@ const URADNE_HODINY = [
 ]
 
 export default function KontaktyScreen() {
-  return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={C.surface} />
-      <ScrollView showsVerticalScrollIndicator={false}>
+  const t = useThemeColors()
+  const styles = useMemo(() => makeStyles(t), [t])
 
+  return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <AtmosphereBackground />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing.xl }}>
         <AppHeader title="Kontakty" subtitle="Obecný úrad Výčapy-Opatovce" />
 
-        {/* ADRESA — brandová karta s farbou obce */}
-        <View style={styles.adresaKarta}>
-          <View style={styles.adresaRow}>
-            <Text style={styles.adresaEmoji}>📍</Text>
-            <View>
-              <Text style={styles.adresaText}>Výčapská 467/14</Text>
-              <Text style={styles.adresaText}>951 44 Výčapy-Opatovce</Text>
+        {/* ADRESA — brandová karta */}
+        <AnimatedEntrance delay={0} style={styles.sekcia}>
+          <View style={styles.adresaKarta}>
+            <View style={styles.decorCircle} />
+            <View style={styles.adresaRow}>
+              <Icon name="location" size={18} color="#FFFFFF" />
+              <View>
+                <Text style={styles.adresaText}>Výčapská 467/14</Text>
+                <Text style={styles.adresaText}>951 44 Výčapy-Opatovce</Text>
+              </View>
             </View>
-          </View>
-          <View style={styles.adresaRow}>
-            <Text style={styles.adresaEmoji}>📞</Text>
-            <TouchableOpacity onPress={() => Linking.openURL('tel:037779515')}>
+            <PressableScale style={styles.adresaRow} scaleTo={0.97} onPress={() => Linking.openURL('tel:037779515')} accessibilityLabel="Zavolať na úrad">
+              <Icon name="kontakty" size={18} color="#FFFFFF" />
               <Text style={styles.adresaLink}>037 / 77 951 51</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.adresaRow}>
-            <Text style={styles.adresaEmoji}>✉️</Text>
-            <TouchableOpacity onPress={() => Linking.openURL('mailto:info@vycapy-opatovce.sk')}>
+            </PressableScale>
+            <PressableScale style={styles.adresaRow} scaleTo={0.97} onPress={() => Linking.openURL('mailto:info@vycapy-opatovce.sk')} accessibilityLabel="Napísať e-mail">
+              <Icon name="aktuality" size={18} color="#FFFFFF" />
               <Text style={styles.adresaLink}>info@vycapy-opatovce.sk</Text>
-            </TouchableOpacity>
+            </PressableScale>
           </View>
-        </View>
+        </AnimatedEntrance>
 
         {/* ÚRADNÉ HODINY */}
-        <View style={styles.sekcia}>
-          <Text style={styles.seklabel}>🕐 Úradné hodiny</Text>
+        <AnimatedEntrance delay={70} style={styles.sekcia}>
+          <View style={styles.seklabelRow}>
+            <Icon name="time" size={16} color={t.primary} />
+            <Text style={styles.seklabel}>Úradné hodiny</Text>
+          </View>
           <View style={styles.hodinyKarta}>
             {URADNE_HODINY.map((h, i) => {
               const jeStvrtok = h.den === 'Štvrtok'
-              const jeDnes = new Date().toLocaleDateString('sk-SK', { weekday: 'long' })
-                .toLowerCase() === h.den.toLowerCase()
+              const jeDnes = new Date().toLocaleDateString('sk-SK', { weekday: 'long' }).toLowerCase() === h.den.toLowerCase()
               return (
-                <View key={i} style={[
-                  styles.hodinyRow,
-                  i < URADNE_HODINY.length - 1 && styles.hodinyRowBorder,
-                  jeDnes && styles.hodinyRowDnes,
-                ]}>
-                  <Text style={[styles.hodinyDen, jeDnes && styles.hodinyDenDnes]}>
-                    {h.den}{jeDnes && ' ← dnes'}
-                  </Text>
-                  <Text style={[
-                    styles.hodinyCas,
-                    jeStvrtok && styles.hodinyStvrtok,
-                    jeDnes && styles.hodinyDenDnes,
-                  ]}>
-                    {h.cas}
-                  </Text>
+                <View key={i} style={[styles.hodinyRow, i < URADNE_HODINY.length - 1 && styles.hodinyRowBorder, jeDnes && styles.hodinyRowDnes]}>
+                  <Text style={[styles.hodinyDen, jeDnes && styles.hodinyDenDnes]}>{h.den}{jeDnes && ' · dnes'}</Text>
+                  <Text style={[styles.hodinyCas, jeStvrtok && styles.hodinyStvrtok, jeDnes && styles.hodinyDenDnes]}>{h.cas}</Text>
                 </View>
               )
             })}
           </View>
-        </View>
+        </AnimatedEntrance>
 
         {/* ZAMESTNANCI */}
-        <View style={styles.sekcia}>
-          <Text style={styles.seklabel}>👥 Zamestnanci úradu</Text>
+        <AnimatedEntrance delay={140} style={styles.sekcia}>
+          <View style={styles.seklabelRow}>
+            <Icon name="people" size={16} color={t.primary} />
+            <Text style={styles.seklabel}>Zamestnanci úradu</Text>
+          </View>
           {KONTAKTY.map((k, i) => (
             <View key={i} style={styles.kontaktKarta}>
               <View style={styles.kontaktHeader}>
-                <Text style={styles.kontaktEmoji}>{k.emoji}</Text>
+                <IconTile name="person" gradient={k.gradient} size={44} iconSize={22} />
                 <View style={styles.kontaktInfo}>
                   <Text style={styles.kontaktMeno}>{k.meno}</Text>
                   <Text style={styles.kontaktFunkcia}>{k.funkcia}</Text>
@@ -134,86 +93,57 @@ export default function KontaktyScreen() {
               </View>
               <View style={styles.kontaktAkcie}>
                 {k.telefon && (
-                  <TouchableOpacity
-                    style={styles.kontaktBtn}
-                    onPress={() => Linking.openURL(`tel:${k.telefon!.replace(/\s/g, '')}`)}
-                  >
-                    <Text style={styles.kontaktBtnText}>📞 {k.telefon}</Text>
-                  </TouchableOpacity>
+                  <PressableScale style={styles.kontaktBtn} scaleTo={0.96} onPress={() => Linking.openURL(`tel:${k.telefon!.replace(/\s/g, '')}`)} accessibilityLabel={`Zavolať ${k.meno}`}>
+                    <Icon name="kontakty" size={14} color={t.secondary} />
+                    <Text style={styles.kontaktBtnText}>{k.telefon}</Text>
+                  </PressableScale>
                 )}
-                <TouchableOpacity
-                  style={[styles.kontaktBtn, styles.kontaktBtnEmail]}
-                  onPress={() => Linking.openURL(`mailto:${k.email}`)}
-                >
-                  <Text style={[styles.kontaktBtnText, styles.kontaktBtnEmailText]}>
-                    ✉️ Email
-                  </Text>
-                </TouchableOpacity>
+                <PressableScale style={[styles.kontaktBtn, styles.kontaktBtnEmail]} scaleTo={0.96} onPress={() => Linking.openURL(`mailto:${k.email}`)} accessibilityLabel={`Napísať e-mail ${k.meno}`}>
+                  <Icon name="aktuality" size={14} color={t.status.info.fg} />
+                  <Text style={[styles.kontaktBtnText, styles.kontaktBtnEmailText]}>Email</Text>
+                </PressableScale>
               </View>
             </View>
           ))}
-        </View>
-
+        </AnimatedEntrance>
       </ScrollView>
     </SafeAreaView>
   )
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.background },
+const makeStyles = (t: ThemeColors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: t.background },
+  sekcia: { paddingHorizontal: spacing.lg, marginTop: spacing.lg },
 
-  // Adresová karta — brandová červená pre maximálnu identifikáciu
   adresaKarta: {
-    backgroundColor: C.primary, margin: 16, borderRadius: 16,
-    padding: 18, gap: 12,
-    shadowColor: C.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: t.primary, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md,
+    overflow: 'hidden', ...shadows.md, shadowColor: C.brand.red,
   },
-  adresaRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  adresaEmoji: { fontSize: 18, width: 24 },
-  adresaText: { fontSize: 14, color: 'rgba(255,255,255,0.92)', lineHeight: 20 },
-  adresaLink: { fontSize: 14, color: C.onPrimary, fontWeight: '700', textDecorationLine: 'underline' },
+  decorCircle: { position: 'absolute', width: 150, height: 150, borderRadius: 75, backgroundColor: 'rgba(255,255,255,0.08)', right: -50, top: -60 },
+  adresaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  adresaText: { ...typo.body, color: 'rgba(255,255,255,0.92)', lineHeight: 20 },
+  adresaLink: { ...typo.bodyB, color: '#FFFFFF', textDecorationLine: 'underline' },
 
-  sekcia: { paddingHorizontal: 16, marginBottom: 16 },
-  seklabel: { fontSize: 16, fontWeight: '800', color: C.text, marginBottom: 10 },
+  seklabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.md },
+  seklabel: { ...typo.h2, color: t.text },
 
-  hodinyKarta: {
-    backgroundColor: C.surface, borderRadius: 14,
-    shadowColor: C.shadow, shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
-    overflow: 'hidden',
-  },
-  hodinyRow: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', padding: 14,
-  },
-  hodinyRowBorder: { borderBottomWidth: 1, borderBottomColor: C.divider },
-  hodinyRowDnes: { backgroundColor: C.accentLight },
-  hodinyDen: { fontSize: 14, fontWeight: '600', color: C.text },
-  hodinyDenDnes: { color: C.accentDark, fontWeight: '800' },
-  hodinyCas: { fontSize: 13, color: C.textSecondary },
+  hodinyKarta: { backgroundColor: t.surface, borderRadius: radius.lg, overflow: 'hidden', ...shadows.sm, shadowColor: t.shadow },
+  hodinyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.md },
+  hodinyRowBorder: { borderBottomWidth: 1, borderBottomColor: t.divider },
+  hodinyRowDnes: { backgroundColor: t.accentLight },
+  hodinyDen: { ...typo.bodyB, color: t.text },
+  hodinyDenDnes: { color: t.accentDark },
+  hodinyCas: { ...typo.caption, color: t.textSecondary },
   hodinyStvrtok: { color: C.brand.red, fontStyle: 'italic' },
 
-  kontaktKarta: {
-    backgroundColor: C.surface, borderRadius: 14, padding: 16,
-    marginBottom: 10,
-    shadowColor: C.shadow, shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
-  },
-  kontaktHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  kontaktEmoji: { fontSize: 32 },
+  kontaktKarta: { backgroundColor: t.surface, borderRadius: radius.lg, padding: spacing.lg, marginBottom: spacing.sm, ...shadows.sm, shadowColor: t.shadow },
+  kontaktHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md },
   kontaktInfo: { flex: 1 },
-  kontaktMeno: { fontSize: 15, fontWeight: '700', color: C.text },
-  kontaktFunkcia: { fontSize: 13, color: C.textMuted, marginTop: 2 },
-  kontaktAkcie: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  kontaktBtn: {
-    backgroundColor: C.secondaryLight, borderRadius: 8,
-    paddingHorizontal: 14, paddingVertical: 8,
-  },
-  kontaktBtnEmail: { backgroundColor: C.status.info.bg },
-  kontaktBtnText: { fontSize: 13, fontWeight: '700', color: C.secondary },
-  kontaktBtnEmailText: { color: C.status.info.fg },
+  kontaktMeno: { ...typo.h3, color: t.text },
+  kontaktFunkcia: { ...typo.caption, color: t.textMuted, marginTop: 2 },
+  kontaktAkcie: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
+  kontaktBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: t.secondaryLight, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  kontaktBtnEmail: { backgroundColor: t.status.info.bg },
+  kontaktBtnText: { ...typo.captionB, color: t.secondary },
+  kontaktBtnEmailText: { color: t.status.info.fg },
 })

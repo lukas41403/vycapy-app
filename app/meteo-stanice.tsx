@@ -16,25 +16,23 @@
  */
 
 import LeafletMap, { LeafletMarker } from '@/components/LeafletMap'
-import { Badge, Card, EmptyState } from '@/components/ui'
+import { AtmosphereBackground, Badge, Card, EmptyState, Icon, IconName, PressableScale } from '@/components/ui'
 import { useTenant } from '@/src/config/tenant'
 import { useObecneZariadenia, Zariadenie } from '@/src/hooks/useObecneZariadenia'
 import { aqiLabel } from '@/src/hooks/useWeather'
 import { useThemeColors } from '@/src/theme/ThemeContext'
-import { radius, shadows, spacing, typo } from '@/src/theme/tokens'
+import { fonts, radius, shadows, spacing, typo } from '@/src/theme/tokens'
 import { useRouter } from 'expo-router'
 import { useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 const METEO_FARBA = '#00838F'
 
@@ -105,15 +103,18 @@ export default function MeteoStaniceScreen() {
   const vybrana = vybranaId ? stanice.find(s => s.id === vybranaId) : null
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: t.background }]}>
-      <StatusBar barStyle="light-content" backgroundColor={METEO_FARBA} />
+    <SafeAreaView style={[styles.safe, { backgroundColor: t.background }]} edges={['top']}>
+      <AtmosphereBackground tint={METEO_FARBA} />
 
       {/* Header */}
       <View style={[styles.header, { backgroundColor: METEO_FARBA }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.back} hitSlop={10}>
-          <Text style={styles.backText}>← Späť</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>📡 Meteo stanice</Text>
+        <PressableScale onPress={() => router.back()} style={styles.back} scaleTo={0.94} accessibilityLabel="Späť">
+          <Icon name="chevronBack" size={20} color="#FFFFFF" /><Text style={styles.backText}>Späť</Text>
+        </PressableScale>
+        <View style={styles.headerTitleRow}>
+          <Icon name="meteo" size={22} color="#FFFFFF" />
+          <Text style={styles.headerTitle}>Meteo stanice</Text>
+        </View>
         <Text style={styles.headerSub}>
           {stanice.length} {stanice.length === 1 ? 'stanica' : stanice.length < 5 ? 'stanice' : 'staníc'}
           {' '}v obci {tenant.nazov}
@@ -139,7 +140,7 @@ export default function MeteoStaniceScreen() {
           </View>
         ) : stanice.length === 0 ? (
           <EmptyState
-            icon="📡"
+            icon="meteo"
             title="Žiadne meteo stanice"
             description={
               'V tabuľke obecne_zariadenia zatiaľ nie sú zariadenia typu "meteo". ' +
@@ -245,20 +246,18 @@ function StanicaKarta({ stanica: s, vybrana, onPress }: {
     >
       <View style={styles.staniceObsah}>
         <View style={styles.staniceTop}>
-          <View style={[
-            styles.staniceIkona,
-            { backgroundColor: (aqi?.color ?? '#9E9E9E') + '22' },
-          ]}>
-            <Text style={styles.staniceEmoji}>📡</Text>
+          <View style={[styles.staniceIkona, { backgroundColor: (aqi?.color ?? '#9E9E9E') + '22' }]}>
+            <Icon name="meteo" size={22} color={aqi?.color ?? '#9E9E9E'} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.staniceNazov, { color: t.text }]} numberOfLines={1}>
               {s.nazov}
             </Text>
             {s.ulica && (
-              <Text style={[styles.staniceUlica, { color: t.textMuted }]} numberOfLines={1}>
-                📍 {s.ulica}
-              </Text>
+              <View style={styles.staniceUlicaRow}>
+                <Icon name="location" size={12} color={t.textMuted} />
+                <Text style={[styles.staniceUlica, { color: t.textMuted }]} numberOfLines={1}>{s.ulica}</Text>
+              </View>
             )}
           </View>
           {aqi && (
@@ -271,25 +270,24 @@ function StanicaKarta({ stanica: s, vybrana, onPress }: {
 
         {!maData && (
           <View style={[styles.noData, { backgroundColor: t.surfaceAlt }]}>
-            <Text style={[styles.noDataText, { color: t.textMuted }]}>
-              ⏳ Stanica zatiaľ neposiela dáta. Čakáme na prvý odpočet.
-            </Text>
+            <Icon name="time" size={14} color={t.textMuted} />
+            <Text style={[styles.noDataText, { color: t.textMuted }]}>Stanica zatiaľ neposiela dáta. Čakáme na prvý odpočet.</Text>
           </View>
         )}
 
         {maData && (
           <View style={[styles.metrikRow, { borderTopColor: t.borderLight }]}>
             {s.teplota != null && (
-              <Metrika emoji="🌡️" hodnota={`${s.teplota.toFixed(1)}°`} label="Teplota" />
+              <Metrika icon="meteo" color="#EF6C00" hodnota={`${s.teplota.toFixed(1)}°`} label="Teplota" />
             )}
             {s.vlhkost != null && (
-              <Metrika emoji="💧" hodnota={`${Math.round(s.vlhkost)}%`} label="Vlhkosť" />
+              <Metrika icon="humidity" color="#0288D1" hodnota={`${Math.round(s.vlhkost)}%`} label="Vlhkosť" />
             )}
             {s.pm25 != null && (
-              <Metrika emoji="🟢" hodnota={s.pm25.toFixed(1)} label="PM2.5" />
+              <Metrika icon="leaf" color="#2E7D32" hodnota={s.pm25.toFixed(1)} label="PM2.5" />
             )}
             {s.pm10 != null && (
-              <Metrika emoji="🔵" hodnota={s.pm10.toFixed(1)} label="PM10" />
+              <Metrika icon="leaf" color="#00838F" hodnota={s.pm10.toFixed(1)} label="PM10" />
             )}
           </View>
         )}
@@ -311,11 +309,11 @@ function StanicaKarta({ stanica: s, vybrana, onPress }: {
   )
 }
 
-function Metrika({ emoji, hodnota, label }: { emoji: string; hodnota: string; label: string }) {
+function Metrika({ icon, color, hodnota, label }: { icon: IconName; color: string; hodnota: string; label: string }) {
   const t = useThemeColors()
   return (
     <View style={styles.metrikBox}>
-      <Text style={styles.metrikEmoji}>{emoji}</Text>
+      <Icon name={icon} size={18} color={color} />
       <Text style={[styles.metrikHodnota, { color: t.text }]}>{hodnota}</Text>
       <Text style={[styles.metrikLabel, { color: t.textMuted }]}>{label}</Text>
     </View>
@@ -330,10 +328,11 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
     gap: 4,
   },
-  back: { alignSelf: 'flex-start' },
-  backText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700', marginBottom: 6 },
+  back: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', marginBottom: 6 },
+  backText: { color: '#FFFFFF', ...typo.bodyB },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   headerTitle: { color: '#FFFFFF', ...typo.h1 },
-  headerSub: { color: 'rgba(255,255,255,0.9)', ...typo.caption, fontWeight: '600' },
+  headerSub: { color: 'rgba(255,255,255,0.9)', ...typo.caption, fontFamily: 'Inter_600SemiBold', marginTop: 2 },
 
   loadingBox: { padding: 60, alignItems: 'center', gap: 12 },
   loadingText: { ...typo.caption, fontWeight: '600' },
@@ -359,9 +358,9 @@ const styles = StyleSheet.create({
     width: 44, height: 44, borderRadius: radius.md,
     justifyContent: 'center', alignItems: 'center',
   },
-  staniceEmoji: { fontSize: 22 },
   staniceNazov: { ...typo.h3 },
-  staniceUlica: { ...typo.caption, marginTop: 1 },
+  staniceUlicaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
+  staniceUlica: { ...typo.caption, flexShrink: 1 },
 
   aqiPill: {
     paddingHorizontal: spacing.sm,
@@ -374,10 +373,11 @@ const styles = StyleSheet.create({
   aqiPillLabel: { color: 'rgba(255,255,255,0.9)', fontSize: 9, fontWeight: '900', marginTop: -2 },
 
   noData: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
     padding: spacing.md,
     borderRadius: radius.sm,
   },
-  noDataText: { ...typo.caption, textAlign: 'center', fontStyle: 'italic' },
+  noDataText: { ...typo.caption, fontStyle: 'italic', flex: 1 },
 
   metrikRow: {
     flexDirection: 'row',

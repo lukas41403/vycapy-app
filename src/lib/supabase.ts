@@ -11,6 +11,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js'
+import { createDemoClient } from './demoSupabase'
 
 // ── WebSocket polyfill pre Node.js SSR ────────────────────────────────────
 // V prehliadači aj v React Native existuje globálny WebSocket.
@@ -29,13 +30,26 @@ if (typeof globalThis !== 'undefined' && typeof (globalThis as any).WebSocket ==
   }
 }
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false,
-  },
-})
+/**
+ * Demo režim — keď chýba Supabase konfigurácia, appka nepadne, ale beží
+ * s lokálnymi ukážkovými dátami (viď demoSupabase.ts). V produkcii sú env
+ * premenné nastavené, takže sa použije reálny klient.
+ */
+export const isDemoMode = !supabaseUrl || !supabaseAnonKey
+
+export const supabase = isDemoMode
+  ? createDemoClient()
+  : createClient(supabaseUrl!, supabaseAnonKey!, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: false,
+      },
+    })
+
+if (isDemoMode && __DEV__) {
+  console.log('[supabase] Demo režim — EXPO_PUBLIC_SUPABASE_URL/ANON_KEY nie sú nastavené, používam ukážkové dáta.')
+}

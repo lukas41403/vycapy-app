@@ -1,24 +1,17 @@
 /**
- * Detail aktuality — article layout.
+ * Detail aktuality — editoriálny článok (serif headline, signature flag accent).
  */
 
-import { C } from '@/constants/colors'
+import { Badge, Button, FlagBanner, Icon, IconTile, PressableScale } from '@/components/ui'
+import { katLabel, katTone, katVisual } from '@/src/config/kategorie'
 import { supabase } from '@/src/lib/supabase'
+import { ThemeColors, useThemeColors } from '@/src/theme/ThemeContext'
+import { fonts, radius, spacing, typo } from '@/src/theme/tokens'
 import { Image } from 'expo-image'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
-import {
-  ActivityIndicator,
-  Alert,
-  SafeAreaView,
-  ScrollView,
-  Share,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native'
+import { useEffect, useMemo, useState } from 'react'
+import { ActivityIndicator, Alert, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 type Aktualita = {
   id: string
@@ -30,47 +23,24 @@ type Aktualita = {
   cover_url: string | null
 }
 
-const KATEGORIA_FARBY: Record<string, { bg: string; text: string }> = {
-  oznam:     { bg: C.status.info.bg,    text: C.status.info.fg },
-  akcia:     { bg: C.status.success.bg, text: C.status.success.fg },
-  uzavierka: { bg: '#FFF3E0',           text: '#E65100' },
-  vypadok:   { bg: C.status.danger.bg,  text: C.status.danger.fg },
-  sport:     { bg: '#E3F2FD',           text: '#1565C0' },
-  ine:       { bg: '#ECEFF1',           text: '#37474F' },
-}
-
-const KATEGORIA_LABEL: Record<string, string> = {
-  oznam: 'Oznam', akcia: 'Akcia', uzavierka: 'Uzávierka',
-  vypadok: 'Výpadok', sport: 'Šport', ine: 'Iné',
-}
-
-const KATEGORIA_PLACEHOLDER: Record<string, { bg: string; emoji: string }> = {
-  oznam:     { bg: '#90A4AE', emoji: '📋' },
-  akcia:     { bg: '#1B5E20', emoji: '🎉' },
-  uzavierka: { bg: '#C62828', emoji: '🚧' },
-  vypadok:   { bg: '#C62828', emoji: '⚠️' },
-  sport:     { bg: '#1565C0', emoji: '⚽' },
-  ine:       { bg: '#607D8B', emoji: '📰' },
-}
+const HERO_HEIGHT = 280
 
 export default function AktualitaDetail() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
+  const t = useThemeColors()
+  const styles = useMemo(() => makeStyles(t), [t])
   const [aktualita, setAktualita] = useState<Aktualita | null>(null)
   const [loading, setLoading] = useState(true)
   const [ulozene, setUlozene] = useState(false)
 
   useEffect(() => {
-    async function fetch() {
-      const { data } = await supabase
-        .from('aktuality')
-        .select('*')
-        .eq('id', id)
-        .single()
-      setAktualita(data)
+    async function fetchOne() {
+      const { data } = await supabase.from('aktuality').select('*').eq('id', id).single()
+      setAktualita(data as Aktualita)
       setLoading(false)
     }
-    fetch()
+    fetchOne()
   }, [id])
 
   async function zdielat() {
@@ -78,124 +48,75 @@ export default function AktualitaDetail() {
     try {
       await Share.share({
         title: aktualita.title,
-        message: `${aktualita.title}\n\n${aktualita.perex || aktualita.body.slice(0, 200) + '...'}\n\n— Obec Výčapy-Opatovce`,
+        message: `${aktualita.title}\n\n${aktualita.perex || aktualita.body.slice(0, 200) + '…'}\n\n— Obec Výčapy-Opatovce`,
       })
     } catch {
       Alert.alert('Chyba', 'Zdieľanie zlyhalo.')
     }
   }
 
-  const kat = aktualita
-    ? (KATEGORIA_FARBY[aktualita.kategoria] ?? KATEGORIA_FARBY.ine)
-    : null
-  const placeholder = aktualita
-    ? (KATEGORIA_PLACEHOLDER[aktualita.kategoria] ?? KATEGORIA_PLACEHOLDER.ine)
-    : null
+  const vis = aktualita ? katVisual(aktualita.kategoria) : null
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={C.surface} />
-
+    <SafeAreaView style={styles.safe} edges={['top']}>
       {/* Nav bar */}
       <View style={styles.navBar}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>← Späť</Text>
-        </TouchableOpacity>
+        <PressableScale style={styles.backBtn} scaleTo={0.94} onPress={() => router.back()} accessibilityLabel="Späť">
+          <Icon name="chevronBack" size={22} color={t.primary} />
+          <Text style={styles.backText}>Späť</Text>
+        </PressableScale>
         {aktualita && (
-          <TouchableOpacity onPress={zdielat} style={styles.shareIcon}>
-            <Text style={styles.shareIconText}>↗</Text>
-          </TouchableOpacity>
+          <PressableScale style={styles.shareIcon} scaleTo={0.9} onPress={zdielat} accessibilityLabel="Zdieľať">
+            <Icon name="share" size={18} color={t.primary} />
+          </PressableScale>
         )}
       </View>
 
-      {loading && (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={C.primary} />
-        </View>
-      )}
+      {loading && <View style={styles.center}><ActivityIndicator size="large" color={t.primary} /></View>}
 
-      {!loading && aktualita && kat && placeholder && (
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* HERO */}
+      {!loading && aktualita && vis && (
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {aktualita.cover_url ? (
             <View style={styles.heroWrap}>
-              <Image
-                source={{ uri: aktualita.cover_url }}
-                style={styles.heroImage}
-                contentFit="cover"
-                transition={300}
-              />
-              <View style={styles.heroOverlay} pointerEvents="none" />
+              <Image source={{ uri: aktualita.cover_url }} style={styles.heroImage} contentFit="cover" transition={300} />
             </View>
           ) : (
-            <View style={[styles.heroPlaceholder, { backgroundColor: placeholder.bg }]}>
-              <Text style={styles.heroPlaceholderEmoji}>{placeholder.emoji}</Text>
-              <View style={styles.heroOverlay} pointerEvents="none" />
-            </View>
+            <IconTile name={vis.icon} gradient={vis.gradient} cornerRadius={0} iconSize={88} style={styles.heroPlaceholder} />
           )}
 
           <View style={styles.content}>
-            {/* Meta */}
             <View style={styles.meta}>
-              <View style={[styles.badge, { backgroundColor: kat.bg }]}>
-                <Text style={[styles.badgeText, { color: kat.text }]}>
-                  {KATEGORIA_LABEL[aktualita.kategoria] ?? aktualita.kategoria}
-                </Text>
-              </View>
+              <Badge label={katLabel(aktualita.kategoria)} tone={katTone(aktualita.kategoria)} />
               <Text style={styles.datum}>
-                {aktualita.published_at
-                  ? new Date(aktualita.published_at).toLocaleDateString('sk-SK', {
-                      day: 'numeric', month: 'long', year: 'numeric',
-                    })
-                  : ''}
+                {aktualita.published_at ? new Date(aktualita.published_at).toLocaleDateString('sk-SK', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}
               </Text>
             </View>
 
-            {/* Titulok */}
             <Text style={styles.title}>{aktualita.title}</Text>
-            <View style={styles.divider} />
+            <FlagBanner width={64} height={4} style={{ marginBottom: spacing.lg }} />
 
-            {/* Perex */}
-            {aktualita.perex && (
-              <Text style={styles.perex}>{aktualita.perex}</Text>
-            )}
-
-            {/* Body */}
+            {aktualita.perex && <Text style={styles.perex}>{aktualita.perex}</Text>}
             <Text style={styles.body}>{aktualita.body}</Text>
 
-            {/* Akcie */}
             <View style={styles.actions}>
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.actionPrimary]}
-                onPress={zdielat}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.actionPrimaryText}>↗  Zdieľať</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.actionSecondary]}
-                activeOpacity={0.8}
+              <Button title="Zdieľať" variant="primary" fullWidth onPress={zdielat} icon={<Icon name="share" size={16} color="#FFFFFF" />} style={{ flex: 1 }} />
+              <Button
+                title={ulozene ? 'Uložené' : 'Uložiť'}
+                variant="outline"
                 onPress={() => setUlozene(u => !u)}
-              >
-                <Text style={styles.actionSecondaryText}>
-                  {ulozene ? '★  Uložené' : '☆  Uložiť'}
-                </Text>
-              </TouchableOpacity>
+                icon={<Icon name={ulozene ? 'bookmark' : 'bookmark'} variant={ulozene ? 'filled' : 'outline'} size={16} color={t.primary} />}
+                style={{ flex: 1 }}
+              />
             </View>
 
-            <Text style={styles.disclaimer}>
-              Zdroj: Oficiálna aplikácia obce Výčapy-Opatovce
-            </Text>
+            <Text style={styles.disclaimer}>Zdroj: Oficiálna aplikácia obce Výčapy-Opatovce</Text>
           </View>
         </ScrollView>
       )}
 
       {!loading && !aktualita && (
         <View style={styles.center}>
-          <Text style={styles.errorIcon}>🔍</Text>
+          <Icon name="search" size={44} color={t.textMuted} />
           <Text style={styles.errorText}>Aktualita sa nenašla</Text>
         </View>
       )}
@@ -203,106 +124,33 @@ export default function AktualitaDetail() {
   )
 }
 
-const HERO_HEIGHT = 280
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.surface },
-
+const makeStyles = (t: ThemeColors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: t.surface },
   navBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: C.borderLight,
-    backgroundColor: C.surface,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    borderBottomWidth: 1, borderBottomColor: t.borderLight, backgroundColor: t.surface,
   },
-  backBtn: { alignSelf: 'flex-start' },
-  backText: { fontSize: 16, color: C.primary, fontWeight: '700' },
-  shareIcon: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: C.primaryLight,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  shareIconText: { fontSize: 18, color: C.primary, fontWeight: '800' },
+  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingVertical: 4, paddingRight: spacing.sm },
+  backText: { ...typo.bodyB, color: t.primary },
+  shareIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: t.primaryLight, justifyContent: 'center', alignItems: 'center' },
 
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8 },
-  errorIcon: { fontSize: 48 },
-  errorText: { fontSize: 16, color: C.textMuted },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.sm },
+  errorText: { ...typo.body, color: t.textMuted },
 
   scroll: { paddingBottom: 40 },
-
   heroWrap: { position: 'relative' },
-  heroImage: {
-    width: '100%',
-    height: HERO_HEIGHT,
-    backgroundColor: C.surfaceAlt,
-  },
-  heroPlaceholder: {
-    width: '100%',
-    height: HERO_HEIGHT,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  heroPlaceholderEmoji: { fontSize: 96, opacity: 0.9 },
-  heroOverlay: {
-    position: 'absolute',
-    left: 0, right: 0, bottom: 0,
-    height: 80,
-    backgroundColor: 'rgba(0,0,0,0.18)',
-  },
+  heroImage: { width: '100%', height: HERO_HEIGHT, backgroundColor: t.surfaceAlt },
+  heroPlaceholder: { width: '100%', height: HERO_HEIGHT, borderRadius: 0 },
 
-  content: { padding: 20 },
+  content: { padding: spacing.xl },
+  meta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
+  datum: { ...typo.caption, color: t.textPlaceholder },
 
-  meta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 16,
-  },
-  badge: { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 },
-  badgeText: { fontSize: 12, fontWeight: '800', letterSpacing: 0.4 },
-  datum: { fontSize: 13, color: C.textPlaceholder },
+  title: { fontFamily: fonts.display, fontSize: 30, color: t.text, lineHeight: 38, letterSpacing: -0.6, marginBottom: spacing.md },
+  perex: { fontSize: 18, color: t.textSecondary, lineHeight: 27, fontStyle: 'italic', fontFamily: fonts.medium, marginBottom: spacing.lg },
+  body: { fontSize: 16, color: t.text, lineHeight: 26, fontFamily: fonts.regular },
 
-  title: {
-    fontSize: 28, fontWeight: '800', color: C.text,
-    lineHeight: 36, letterSpacing: -0.5, marginBottom: 16,
-  },
-
-  divider: { height: 2, backgroundColor: C.divider, marginBottom: 18, width: 40 },
-
-  perex: {
-    fontSize: 18,
-    color: C.textSecondary,
-    lineHeight: 27,
-    fontStyle: 'italic',
-    fontWeight: '500',
-    marginBottom: 20,
-  },
-
-  body: { fontSize: 16, color: C.text, lineHeight: 26 },
-
-  actions: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 28,
-  },
-  actionBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  actionPrimary: { backgroundColor: C.primary },
-  actionPrimaryText: { color: C.onPrimary, fontSize: 15, fontWeight: '700' },
-  actionSecondary: {
-    backgroundColor: C.surfaceAlt,
-    borderWidth: 1.5,
-    borderColor: C.border,
-  },
-  actionSecondaryText: { color: C.text, fontSize: 15, fontWeight: '700' },
-
-  disclaimer: {
-    fontSize: 12, color: C.textMuted, textAlign: 'center',
-    marginTop: 24, lineHeight: 18,
-  },
+  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xl },
+  disclaimer: { ...typo.caption, color: t.textMuted, textAlign: 'center', marginTop: spacing.xl, lineHeight: 18 },
 })

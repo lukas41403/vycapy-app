@@ -15,28 +15,26 @@
  *   - "Otvoriť službu" (ak je naviazaná na /sluzba/[id])
  */
 
-import { Badge, Card } from '@/components/ui'
+import { AtmosphereBackground, Badge, Card, Counter, Icon, IconName, PressableScale } from '@/components/ui'
 import LeafletMap, { LeafletMarker } from '@/components/LeafletMap'
 import { C } from '@/constants/colors'
 import { POIKategoria, PointZaujmu, useTenant } from '@/src/config/tenant'
 import { useObecneZariadenia, Zariadenie } from '@/src/hooks/useObecneZariadenia'
 import { supabase } from '@/src/lib/supabase'
 import { useThemeColors } from '@/src/theme/ThemeContext'
-import { radius, shadows, spacing, typo } from '@/src/theme/tokens'
+import { fonts, radius, shadows, spacing, typo } from '@/src/theme/tokens'
 import { useRouter } from 'expo-router'
 import { useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
   Linking,
-  SafeAreaView,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 const MAPA_MODRA = '#0D47A1'
 
@@ -70,13 +68,13 @@ type Hlasenie = {
 
 type Filter = 'vsetko' | 'sluzby' | 'sport_kultura' | 'skolstvo' | 'infrastruktura' | 'hlasenia'
 
-const FILTRE: { id: Filter; label: string }[] = [
-  { id: 'vsetko',         label: '🗂️ Všetko' },
-  { id: 'sluzby',         label: '🏥 Služby' },
-  { id: 'sport_kultura',  label: '⚽ Šport / kultúra' },
-  { id: 'skolstvo',       label: '🎒 Školstvo' },
-  { id: 'infrastruktura', label: '💡 Infraštruktúra' },
-  { id: 'hlasenia',       label: '⚠️ Hlásenia' },
+const FILTRE: { id: Filter; label: string; icon: IconName }[] = [
+  { id: 'vsetko',         label: 'Všetko',          icon: 'grid' },
+  { id: 'sluzby',         label: 'Služby',          icon: 'sluzby' },
+  { id: 'sport_kultura',  label: 'Šport / kultúra', icon: 'fc' },
+  { id: 'skolstvo',       label: 'Školstvo',        icon: 'people' },
+  { id: 'infrastruktura', label: 'Infraštruktúra',  icon: 'bulb' },
+  { id: 'hlasenia',       label: 'Hlásenia',        icon: 'hlasenie' },
 ]
 
 const SLUZBY_KAT: POIKategoria[] = ['urad', 'zdravotnictvo', 'lekaren', 'posta', 'veterina', 'kostol', 'defibrilator']
@@ -206,15 +204,18 @@ export default function MapaScreen() {
   const loading = loadZ || loadH
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: t.background }]}>
-      <StatusBar barStyle="light-content" backgroundColor={MAPA_MODRA} />
+    <SafeAreaView style={[styles.safe, { backgroundColor: t.background }]} edges={['top']}>
+      <AtmosphereBackground tint={MAPA_MODRA} />
 
       {/* Header */}
       <View style={[styles.header, { backgroundColor: MAPA_MODRA }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.back} hitSlop={10}>
-          <Text style={styles.backText}>← Späť</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>🗺️ Mapa obce</Text>
+        <PressableScale onPress={() => router.back()} style={styles.back} scaleTo={0.94} accessibilityLabel="Späť">
+          <Icon name="chevronBack" size={20} color="#FFFFFF" /><Text style={styles.backText}>Späť</Text>
+        </PressableScale>
+        <View style={styles.headerTitleRow}>
+          <Icon name="mapa" size={22} color="#FFFFFF" />
+          <Text style={styles.headerTitle}>Mapa obce</Text>
+        </View>
         <Text style={styles.headerSub}>{tenant.nazov} · OpenStreetMap</Text>
       </View>
 
@@ -229,6 +230,7 @@ export default function MapaScreen() {
             <FilterChip
               key={f.id}
               label={f.label}
+              icon={f.icon}
               active={filter === f.id}
               onPress={() => { setFilter(f.id); setVybraneId(null) }}
             />
@@ -255,24 +257,9 @@ export default function MapaScreen() {
 
         {/* Štatistika */}
         <View style={styles.statsRow}>
-          <StatCard
-            label="Bodov záujmu"
-            value={tenant.pointyZaujmu.length}
-            color={MAPA_MODRA}
-            emoji="📍"
-          />
-          <StatCard
-            label="Zariadení s GPS"
-            value={zariadenia.filter((z: any) => z.lat != null && z.lng != null).length}
-            color="#0288D1"
-            emoji="📡"
-          />
-          <StatCard
-            label="Hlásení"
-            value={hlasenia.length}
-            color={C.brand.red}
-            emoji="⚠️"
-          />
+          <StatCard label="Bodov záujmu" value={tenant.pointyZaujmu.length} color={MAPA_MODRA} icon="location" />
+          <StatCard label="Zariadení s GPS" value={zariadenia.filter((z: any) => z.lat != null && z.lng != null).length} color="#0288D1" icon="meteo" />
+          <StatCard label="Hlásení" value={hlasenia.length} color={C.brand.red} icon="hlasenie" />
         </View>
 
         {/* Detail vybraného pinu */}
@@ -287,13 +274,9 @@ export default function MapaScreen() {
                       ? (vybrane.data as any).nazov
                       : `Hlásenie · ${(vybrane.data as Hlasenie).kategoria}`}
                 </Text>
-                <TouchableOpacity
-                  onPress={() => setVybraneId(null)}
-                  hitSlop={10}
-                  style={styles.detailClose}
-                >
-                  <Text style={[styles.detailCloseTxt, { color: t.textMuted }]}>✕</Text>
-                </TouchableOpacity>
+                <PressableScale onPress={() => setVybraneId(null)} scaleTo={0.85} style={styles.detailClose} accessibilityLabel="Zavrieť">
+                  <Icon name="close" size={20} color={t.textMuted} />
+                </PressableScale>
               </View>
 
               {vybrane.kind === 'poi' && (
@@ -323,42 +306,36 @@ export default function MapaScreen() {
 }
 
 // ─── Filter Chip ─────────────────────────────────────────────────────────
-function FilterChip({ label, active, onPress }: {
-  label: string; active: boolean; onPress: () => void
+function FilterChip({ label, icon, active, onPress }: {
+  label: string; icon: IconName; active: boolean; onPress: () => void
 }) {
   const t = useThemeColors()
   return (
-    <TouchableOpacity
+    <PressableScale
       style={[
         styles.chip,
         { backgroundColor: t.surface, borderColor: t.border },
         active && { backgroundColor: MAPA_MODRA, borderColor: MAPA_MODRA },
       ]}
+      scaleTo={0.95}
       onPress={onPress}
-      activeOpacity={0.75}
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
+      accessibilityLabel={label}
     >
-      <Text style={[
-        styles.chipText,
-        { color: t.textSecondary },
-        active && { color: '#FFFFFF', fontWeight: '900' },
-      ]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
+      <Icon name={icon} size={14} color={active ? '#FFFFFF' : t.textSecondary} />
+      <Text style={[styles.chipText, { color: active ? '#FFFFFF' : t.textSecondary }]}>{label}</Text>
+    </PressableScale>
   )
 }
 
 // ─── Stat Card ───────────────────────────────────────────────────────────
-function StatCard({ label, value, color, emoji }: {
-  label: string; value: number; color: string; emoji: string
+function StatCard({ label, value, color, icon }: {
+  label: string; value: number; color: string; icon: IconName
 }) {
   const t = useThemeColors()
   return (
     <View style={[styles.statCard, { backgroundColor: t.surface, shadowColor: t.shadow }]}>
-      <Text style={styles.statEmoji}>{emoji}</Text>
-      <Text style={[styles.statNum, { color }]}>{value}</Text>
+      <Icon name={icon} size={20} color={color} />
+      <Counter value={value} style={[styles.statNum, { color }]} />
       <Text style={[styles.statLabel, { color: t.textSecondary }]}>{label}</Text>
     </View>
   )
@@ -382,40 +359,28 @@ function PoiDetail({ poi, router, t }: { poi: PointZaujmu; router: any; t: any }
       )}
       <View style={styles.actionRow}>
         {poi.telefon && (
-          <TouchableOpacity
+          <PressableScale
             style={[styles.actionBtn, { backgroundColor: C.brand.green }]}
-            onPress={() => {
-              Alert.alert(
-                'Zavolať?',
-                poi.nazov,
-                [
-                  { text: 'Zrušiť', style: 'cancel' },
-                  { text: 'Zavolať', onPress: () => Linking.openURL(`tel:${poi.telefon}`) },
-                ],
-              )
-            }}
+            scaleTo={0.96}
+            onPress={() => Alert.alert('Zavolať?', poi.nazov, [{ text: 'Zrušiť', style: 'cancel' }, { text: 'Zavolať', onPress: () => Linking.openURL(`tel:${poi.telefon}`) }])}
+            accessibilityLabel="Zavolať"
           >
-            <Text style={styles.actionBtnText}>📞 Zavolať</Text>
-          </TouchableOpacity>
+            <Icon name="kontakty" size={14} color="#fff" /><Text style={styles.actionBtnText}>Zavolať</Text>
+          </PressableScale>
         )}
         {poi.sluzbaId && (
-          <TouchableOpacity
-            style={[styles.actionBtn, { backgroundColor: MAPA_MODRA }]}
-            onPress={() => router.push(`/sluzba/${poi.sluzbaId}` as never)}
-          >
-            <Text style={styles.actionBtnText}>📋 Otvoriť detail</Text>
-          </TouchableOpacity>
+          <PressableScale style={[styles.actionBtn, { backgroundColor: MAPA_MODRA }]} scaleTo={0.96} onPress={() => router.push(`/sluzba/${poi.sluzbaId}` as never)} accessibilityLabel="Otvoriť detail">
+            <Icon name="document" size={14} color="#fff" /><Text style={styles.actionBtnText}>Detail</Text>
+          </PressableScale>
         )}
-        <TouchableOpacity
+        <PressableScale
           style={[styles.actionBtn, { backgroundColor: t.surfaceAlt, borderWidth: 1, borderColor: t.border }]}
-          onPress={() => {
-            // Otvor v default mapách (mapy.cz / Google Maps universal link)
-            const url = `https://www.google.com/maps/search/?api=1&query=${poi.lat},${poi.lng}`
-            Linking.openURL(url)
-          }}
+          scaleTo={0.96}
+          onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${poi.lat},${poi.lng}`)}
+          accessibilityLabel="Navigovať"
         >
-          <Text style={[styles.actionBtnText, { color: t.text }]}>🧭 Navigovať</Text>
-        </TouchableOpacity>
+          <Icon name="navigate" size={14} color={t.text} /><Text style={[styles.actionBtnText, { color: t.text }]}>Navigovať</Text>
+        </PressableScale>
       </View>
     </View>
   )
@@ -426,7 +391,7 @@ function DevDetail({ dev, t }: { dev: Zariadenie | any; t: any }) {
   return (
     <View style={{ gap: 6 }}>
       {dev.ulica && (
-        <Text style={[styles.detailText, { color: t.textSecondary }]}>📍 {dev.ulica}</Text>
+        <View style={styles.detailRow}><Icon name="location" size={14} color={t.textMuted} /><Text style={[styles.detailText, { color: t.textSecondary }]}>{dev.ulica}</Text></View>
       )}
       <Text style={[styles.detailText, { color: t.textSecondary }]}>Typ: {dev.typ}</Text>
       {dev.stav != null && (
@@ -456,7 +421,7 @@ function HlasenieDetail({ h, t }: { h: Hlasenie; t: any }) {
         Stav: <Text style={{ fontWeight: '800', color: C.brand.red }}>{h.status}</Text>
       </Text>
       {h.adresa && (
-        <Text style={[styles.detailText, { color: t.textSecondary }]}>📍 {h.adresa}</Text>
+        <View style={styles.detailRow}><Icon name="location" size={14} color={t.textMuted} /><Text style={[styles.detailText, { color: t.textSecondary }]}>{h.adresa}</Text></View>
       )}
       <Text style={[styles.detailText, { color: t.textSecondary, marginTop: 4 }]} numberOfLines={5}>
         {h.popis}
@@ -475,20 +440,22 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
     gap: 4,
   },
-  back: { alignSelf: 'flex-start' },
-  backText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700', marginBottom: 6 },
+  back: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', marginBottom: 6 },
+  backText: { color: '#FFFFFF', ...typo.bodyB },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   headerTitle: { color: '#FFFFFF', ...typo.h1 },
-  headerSub: { color: 'rgba(255,255,255,0.85)', ...typo.caption, fontWeight: '600' },
+  headerSub: { color: 'rgba(255,255,255,0.85)', ...typo.caption, fontFamily: 'Inter_600SemiBold', marginTop: 2 },
 
   chipsWrap: { borderBottomWidth: 1 },
   chipsRow: { padding: spacing.md, gap: spacing.sm },
   chip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
     borderRadius: radius.pill,
     borderWidth: 1.5,
   },
-  chipText: { ...typo.caption, fontWeight: '700' },
+  chipText: { ...typo.caption, fontFamily: 'Inter_700Bold' },
 
   caption: {
     ...typo.micro,
@@ -510,9 +477,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...shadows.sm,
   },
-  statEmoji: { fontSize: 22 },
-  statNum: { fontSize: 22, fontWeight: '900', marginTop: 2 },
-  statLabel: { fontSize: 11, marginTop: 2, fontWeight: '700', textAlign: 'center' },
+  statNum: { fontSize: 24, fontFamily: fonts.display, marginTop: 4, letterSpacing: -0.3 },
+  statLabel: { fontSize: 11, marginTop: 2, fontFamily: 'Inter_700Bold', textAlign: 'center' },
 
   // Detail
   detailHead: {
@@ -537,6 +503,7 @@ const styles = StyleSheet.create({
   },
   coordText: { fontSize: 11, fontWeight: '600', fontFamily: 'monospace' },
   detailText: { ...typo.body },
+  detailRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 
   actionRow: {
     flexDirection: 'row',
@@ -545,11 +512,12 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   actionBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: spacing.md,
     paddingVertical: 10,
     borderRadius: radius.sm,
   },
-  actionBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  actionBtnText: { color: '#FFFFFF', ...typo.captionB },
 
   loadingBox: {
     flexDirection: 'row',

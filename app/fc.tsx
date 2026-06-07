@@ -1,50 +1,45 @@
 /**
- * FC Výčapy-Opatovce — sekcia futbalového klubu.
- *
- * Interný tab bar (nie bottom nav):
- *   📅 Program  — nadchádzajúce zápasy
- *   📊 Výsledky — odohraté zápasy
- *   👥 Hráči    — kádra rozdelená podľa pozícií
- *   🔗 Futbalnet — odkaz na oficiálnu stránku
+ * FC Výčapy-Opatovce — sekcia futbalového klubu (Program / Výsledky / Hráči / Futbalnet).
+ * Editorial + theme-aware (useStyles hook), Icon systém. Klubová zelená je konštantná.
  */
 
+import { Button, Icon, IconName, PressableScale } from '@/components/ui'
 import { C } from '@/constants/colors'
 import { Hrac, useFcHraci, useFcZapasy, Zapas } from '@/src/hooks/useFc'
+import { ThemeColors, useThemeColors } from '@/src/theme/ThemeContext'
+import { fonts, radius, shadows, spacing, typo } from '@/src/theme/tokens'
 import { useRouter } from 'expo-router'
-import { useState } from 'react'
-import {
-  ActivityIndicator,
-  Linking,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native'
+import { useMemo, useState } from 'react'
+import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 const FC_GREEN = '#1B5E20'
 const FC_GREEN_LIGHT = '#E8F5E9'
-const FUTBALNET_URL =
-  'https://sportnet.sme.sk/futbalnet/k/zdruzenie-fc-vycapy-opatovce/tim/dospeli-m-a/program/'
+const FUTBALNET_URL = 'https://sportnet.sme.sk/futbalnet/k/zdruzenie-fc-vycapy-opatovce/tim/dospeli-m-a/program/'
+
+const useStyles = () => { const t = useThemeColors(); return useMemo(() => makeStyles(t), [t]) }
 
 type TabKey = 'program' | 'vysledky' | 'hraci' | 'futbalnet'
+const TABS: { id: TabKey; icon: IconName; label: string }[] = [
+  { id: 'program',   icon: 'podujatia', label: 'Program' },
+  { id: 'vysledky',  icon: 'trophy',    label: 'Výsledky' },
+  { id: 'hraci',     icon: 'people',    label: 'Hráči' },
+  { id: 'futbalnet', icon: 'globe',     label: 'Futbalnet' },
+]
 
 export default function FcScreen() {
+  const t = useThemeColors()
+  const styles = useStyles()
   const router = useRouter()
   const [tab, setTab] = useState<TabKey>('program')
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={FC_GREEN} />
-
-      {/* Header */}
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.back}>
-          <Text style={styles.backText}>← Späť</Text>
-        </TouchableOpacity>
-
+        <PressableScale onPress={() => router.back()} style={styles.back} scaleTo={0.94} accessibilityLabel="Späť">
+          <Icon name="chevronBack" size={20} color="#FFFFFF" />
+          <Text style={styles.backText}>Späť</Text>
+        </PressableScale>
         <View style={styles.headerRow}>
           <View style={styles.logo}>
             <Text style={styles.logoText}>FC</Text>
@@ -57,31 +52,18 @@ export default function FcScreen() {
         </View>
       </View>
 
-      {/* Interný tab bar */}
       <View style={styles.tabBar}>
-        {([
-          { id: 'program',   emoji: '📅', label: 'Program'  },
-          { id: 'vysledky',  emoji: '📊', label: 'Výsledky' },
-          { id: 'hraci',     emoji: '👥', label: 'Hráči'    },
-          { id: 'futbalnet', emoji: '🔗', label: 'Futbalnet'},
-        ] as const).map(t => (
-          <TouchableOpacity
-            key={t.id}
-            style={[styles.tab, tab === t.id && styles.tabActive]}
-            onPress={() => setTab(t.id)}
-          >
-            <Text style={styles.tabEmoji}>{t.emoji}</Text>
-            <Text
-              style={[styles.tabLabel, tab === t.id && styles.tabLabelActive]}
-              numberOfLines={1}
-            >
-              {t.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {TABS.map(tb => {
+          const active = tab === tb.id
+          return (
+            <PressableScale key={tb.id} style={[styles.tab, active && styles.tabActive]} scaleTo={0.95} onPress={() => setTab(tb.id)} accessibilityLabel={tb.label}>
+              <Icon name={tb.icon} size={18} color={active ? FC_GREEN : t.textMuted} variant={active ? 'filled' : 'outline'} />
+              <Text style={[styles.tabLabel, active && styles.tabLabelActive]} numberOfLines={1}>{tb.label}</Text>
+            </PressableScale>
+          )
+        })}
       </View>
 
-      {/* Obsah */}
       {tab === 'program'   && <ProgramTab />}
       {tab === 'vysledky'  && <VysledkyTab />}
       {tab === 'hraci'     && <HraciTab />}
@@ -90,22 +72,17 @@ export default function FcScreen() {
   )
 }
 
-// ─── Program ───────────────────────────────────────────────────────────────
 function ProgramTab() {
+  const styles = useStyles()
+  const t = useThemeColors()
   const { zapasy, loading, error } = useFcZapasy()
   const [view, setView] = useState<'list' | 'month'>('list')
-  const nadchadzajuce = zapasy
-    .filter(z => z.goly_my == null)
-    .sort((a, b) => new Date(a.datum).getTime() - new Date(b.datum).getTime())
+  const nadchadzajuce = zapasy.filter(z => z.goly_my == null).sort((a, b) => new Date(a.datum).getTime() - new Date(b.datum).getTime())
 
   if (loading) return <Loading />
   if (error) return <ErrorBox msg={error} hint="Skontroluj že tabuľka fc_zapasy existuje v Supabase." />
+  if (nadchadzajuce.length === 0) return <Empty icon="podujatia" title="Žiadne nadchádzajúce zápasy" />
 
-  if (nadchadzajuce.length === 0) {
-    return <Empty emoji="📅" title="Žiadne nadchádzajúce zápasy" />
-  }
-
-  // Group by month for month view
   const podlaMesiaca = nadchadzajuce.reduce((acc, z) => {
     const m = new Date(z.datum).toLocaleDateString('sk-SK', { month: 'long', year: 'numeric' })
     const key = m.charAt(0).toUpperCase() + m.slice(1)
@@ -117,75 +94,43 @@ function ProgramTab() {
   return (
     <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
       <View style={styles.fcModeBar}>
-        <TouchableOpacity
-          style={[styles.fcModeBtn, view === 'list' && styles.fcModeBtnActive]}
-          onPress={() => setView('list')}
-        >
-          <Text style={[styles.fcModeBtnText, view === 'list' && styles.fcModeBtnTextActive]}>
-            ☰ Zoznam
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.fcModeBtn, view === 'month' && styles.fcModeBtnActive]}
-          onPress={() => setView('month')}
-        >
-          <Text style={[styles.fcModeBtnText, view === 'month' && styles.fcModeBtnTextActive]}>
-            📅 Mesiac
-          </Text>
-        </TouchableOpacity>
+        {(['list', 'month'] as const).map(v => (
+          <PressableScale key={v} style={[styles.fcModeBtn, view === v && styles.fcModeBtnActive]} scaleTo={0.96} onPress={() => setView(v)} accessibilityLabel={v === 'list' ? 'Zoznam' : 'Mesiac'}>
+            <Icon name={v === 'list' ? 'list' : 'podujatia'} size={14} color={view === v ? FC_GREEN : t.textMuted} />
+            <Text style={[styles.fcModeBtnText, view === v && styles.fcModeBtnTextActive]}>{v === 'list' ? 'Zoznam' : 'Mesiac'}</Text>
+          </PressableScale>
+        ))}
       </View>
-
-      {view === 'list' ? (
-        nadchadzajuce.map(z => <ZapasKarta key={z.id} zapas={z} typ="program" />)
-      ) : (
-        Object.entries(podlaMesiaca).map(([m, zList]) => (
-          <View key={m} style={{ gap: 12, marginBottom: 8 }}>
-            <View style={styles.fcMonthHeader}>
-              <View style={styles.fcMonthLine} />
-              <Text style={styles.fcMonthLabel}>{m}</Text>
-              <View style={styles.fcMonthLine} />
-            </View>
+      {view === 'list'
+        ? nadchadzajuce.map(z => <ZapasKarta key={z.id} zapas={z} typ="program" />)
+        : Object.entries(podlaMesiaca).map(([m, zList]) => (
+          <View key={m} style={{ gap: spacing.md, marginBottom: spacing.sm }}>
+            <View style={styles.fcMonthHeader}><View style={styles.fcMonthLine} /><Text style={styles.fcMonthLabel}>{m}</Text><View style={styles.fcMonthLine} /></View>
             {zList.map(z => <ZapasKarta key={z.id} zapas={z} typ="program" />)}
           </View>
-        ))
-      )}
+        ))}
     </ScrollView>
   )
 }
 
-// ─── Výsledky ──────────────────────────────────────────────────────────────
 function VysledkyTab() {
+  const styles = useStyles()
   const { zapasy, loading, error } = useFcZapasy()
-  const odohrate = zapasy
-    .filter(z => z.goly_my != null && z.goly_supar != null)
-    .sort((a, b) => new Date(b.datum).getTime() - new Date(a.datum).getTime())
-
+  const odohrate = zapasy.filter(z => z.goly_my != null && z.goly_supar != null).sort((a, b) => new Date(b.datum).getTime() - new Date(a.datum).getTime())
   if (loading) return <Loading />
   if (error) return <ErrorBox msg={error} hint="Skontroluj že tabuľka fc_zapasy existuje v Supabase." />
-
-  if (odohrate.length === 0) {
-    return <Empty emoji="📊" title="Žiadne odohraté zápasy" />
-  }
-
-  return (
-    <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-      {odohrate.map(z => <ZapasKarta key={z.id} zapas={z} typ="vysledok" />)}
-    </ScrollView>
-  )
+  if (odohrate.length === 0) return <Empty icon="trophy" title="Žiadne odohraté zápasy" />
+  return <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>{odohrate.map(z => <ZapasKarta key={z.id} zapas={z} typ="vysledok" />)}</ScrollView>
 }
 
 function ZapasKarta({ zapas, typ }: { zapas: Zapas; typ: 'program' | 'vysledok' }) {
+  const styles = useStyles()
+  const t = useThemeColors()
   const datum = new Date(zapas.datum)
-  const denStr = datum.toLocaleDateString('sk-SK', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-  })
+  const denStr = datum.toLocaleDateString('sk-SK', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
   const cas = datum.toLocaleTimeString('sk-SK', { hour: '2-digit', minute: '2-digit' })
+  const open = () => { if (zapas.futbalnet_url) Linking.openURL(zapas.futbalnet_url) }
 
-  const open = () => {
-    if (zapas.futbalnet_url) Linking.openURL(zapas.futbalnet_url)
-  }
-
-  // Výsledok výpočet
   let vysledokTyp: 'vyhra' | 'prehra' | 'remiza' | null = null
   if (typ === 'vysledok' && zapas.goly_my != null && zapas.goly_supar != null) {
     if (zapas.goly_my > zapas.goly_supar) vysledokTyp = 'vyhra'
@@ -193,399 +138,195 @@ function ZapasKarta({ zapas, typ }: { zapas: Zapas; typ: 'program' | 'vysledok' 
     else vysledokTyp = 'remiza'
   }
   const vysledokConfig = {
-    vyhra:  { label: '✓ Výhra',  color: FC_GREEN, bg: FC_GREEN_LIGHT },
-    prehra: { label: '✗ Prehra', color: C.brand.red, bg: C.primaryLight },
-    remiza: { label: '= Remíza', color: '#616161',  bg: '#EEEEEE' },
+    vyhra:  { label: 'Výhra',  color: FC_GREEN, bg: FC_GREEN_LIGHT },
+    prehra: { label: 'Prehra', color: C.brand.red, bg: t.primaryLight },
+    remiza: { label: 'Remíza', color: t.textSecondary, bg: t.surfaceAlt },
   }
 
   return (
-    <TouchableOpacity
-      style={styles.zapasKarta}
-      activeOpacity={zapas.futbalnet_url ? 0.85 : 1}
-      onPress={open}
-    >
-      {/* horný riadok: doma/vonku */}
+    <PressableScale style={styles.zapasKarta} scaleTo={zapas.futbalnet_url ? 0.98 : 1} onPress={open} accessibilityLabel={`Zápas vs ${zapas.supar}`}>
       <View style={styles.zapasTop}>
-        <View style={[
-          styles.domaBadge,
-          { backgroundColor: zapas.je_doma ? FC_GREEN_LIGHT : '#ECEFF1' }
-        ]}>
-          <Text style={[
-            styles.domaText,
-            { color: zapas.je_doma ? FC_GREEN : '#37474F' }
-          ]}>
-            {zapas.je_doma ? '🏠 DOMA' : '✈️ VONKU'}
-          </Text>
+        <View style={[styles.domaBadge, { backgroundColor: zapas.je_doma ? FC_GREEN_LIGHT : t.surfaceAlt }]}>
+          <Icon name={zapas.je_doma ? 'domov' : 'navigate'} size={12} color={zapas.je_doma ? FC_GREEN : t.textSecondary} />
+          <Text style={[styles.domaText, { color: zapas.je_doma ? FC_GREEN : t.textSecondary }]}>{zapas.je_doma ? 'DOMA' : 'VONKU'}</Text>
         </View>
         {typ === 'vysledok' && vysledokTyp && (
           <View style={[styles.vysledokBadge, { backgroundColor: vysledokConfig[vysledokTyp].bg }]}>
-            <Text style={[styles.vysledokBadgeText, { color: vysledokConfig[vysledokTyp].color }]}>
-              {vysledokConfig[vysledokTyp].label}
-            </Text>
+            <Text style={[styles.vysledokBadgeText, { color: vysledokConfig[vysledokTyp].color }]}>{vysledokConfig[vysledokTyp].label}</Text>
           </View>
         )}
       </View>
 
-      {/* tímy + výsledok */}
       {typ === 'program' ? (
         <Text style={styles.zapasTitle}>vs {zapas.supar}</Text>
       ) : (
         <View style={styles.skoreRow}>
           <Text style={styles.skoreTeam}>FC V-O</Text>
           <View style={styles.skoreBox}>
-            <Text style={[
-              styles.skoreText,
-              vysledokTyp === 'vyhra' && { color: FC_GREEN },
-              vysledokTyp === 'prehra' && { color: C.brand.red },
-            ]}>
-              {zapas.goly_my} : {zapas.goly_supar}
-            </Text>
+            <Text style={[styles.skoreText, vysledokTyp === 'vyhra' && { color: FC_GREEN }, vysledokTyp === 'prehra' && { color: C.brand.red }]}>{zapas.goly_my} : {zapas.goly_supar}</Text>
           </View>
-          <Text style={styles.skoreTeam} numberOfLines={1}>{zapas.supar}</Text>
+          <Text style={[styles.skoreTeam, { textAlign: 'right' }]} numberOfLines={1}>{zapas.supar}</Text>
         </View>
       )}
 
-      {/* meta */}
       <View style={styles.zapasMeta}>
-        <Text style={styles.zapasMetaText}>📅 {denStr.charAt(0).toUpperCase() + denStr.slice(1)}</Text>
-        {typ === 'program' && (
-          <Text style={styles.zapasMetaText}>⏰ {cas}</Text>
-        )}
-        {zapas.miesto && (
-          <Text style={styles.zapasMetaText}>📍 {zapas.miesto}</Text>
-        )}
-        <Text style={styles.zapasMetaText}>🏆 {zapas.sutaz}</Text>
+        <MetaRow icon="podujatia" text={denStr.charAt(0).toUpperCase() + denStr.slice(1)} />
+        {typ === 'program' && <MetaRow icon="time" text={cas} />}
+        {zapas.miesto && <MetaRow icon="location" text={zapas.miesto} />}
+        <MetaRow icon="trophy" text={zapas.sutaz} />
       </View>
 
       {typ === 'program' && zapas.futbalnet_url && (
-        <View style={styles.zapasFooter}>
-          <Text style={styles.zapasLink}>Detail na Futbalnet →</Text>
-        </View>
+        <View style={styles.zapasFooter}><Text style={styles.zapasLink}>Detail na Futbalnet →</Text></View>
       )}
-    </TouchableOpacity>
+    </PressableScale>
   )
 }
 
-// ─── Hráči ─────────────────────────────────────────────────────────────────
-function HraciTab() {
-  const { hraci, loading, error } = useFcHraci()
+function MetaRow({ icon, text }: { icon: IconName; text: string }) {
+  const styles = useStyles()
+  const t = useThemeColors()
+  return <View style={styles.metaRow}><Icon name={icon} size={13} color={t.textMuted} /><Text style={styles.zapasMetaText}>{text}</Text></View>
+}
 
+function HraciTab() {
+  const styles = useStyles()
+  const { hraci, loading, error } = useFcHraci()
   if (loading) return <Loading />
   if (error) return <ErrorBox msg={error} hint="Skontroluj že tabuľka fc_hraci existuje v Supabase." />
+  if (hraci.length === 0) return <Empty icon="people" title="Káder zatiaľ neuvedený" />
 
-  const treneri = hraci.filter(h => h.je_trener)
-  const brankari = hraci.filter(h => !h.je_trener && h.pozicia === 'brankár')
-  const obrancovia = hraci.filter(h => !h.je_trener && h.pozicia === 'obranca')
-  const zaloznici = hraci.filter(h => !h.je_trener && h.pozicia === 'záložník')
-  const utocnici = hraci.filter(h => !h.je_trener && h.pozicia === 'útočník')
-
-  if (hraci.length === 0) {
-    return <Empty emoji="👥" title="Káder zatiaľ neuvedený" />
-  }
+  const sekcie: { titul: string; data: Hrac[]; jeTrener?: boolean }[] = [
+    { titul: 'Tréneri', data: hraci.filter(h => h.je_trener), jeTrener: true },
+    { titul: 'Brankári', data: hraci.filter(h => !h.je_trener && h.pozicia === 'brankár') },
+    { titul: 'Obrancovia', data: hraci.filter(h => !h.je_trener && h.pozicia === 'obranca') },
+    { titul: 'Záložníci', data: hraci.filter(h => !h.je_trener && h.pozicia === 'záložník') },
+    { titul: 'Útočníci', data: hraci.filter(h => !h.je_trener && h.pozicia === 'útočník') },
+  ]
 
   return (
     <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-      {treneri.length > 0 && (
-        <HraciSekcia titul="🎯 Tréneri" hraci={treneri} jeTrener />
-      )}
-      {brankari.length > 0   && <HraciSekcia titul="🥅 Brankári"   hraci={brankari} />}
-      {obrancovia.length > 0 && <HraciSekcia titul="🛡️ Obrancovia" hraci={obrancovia} />}
-      {zaloznici.length > 0  && <HraciSekcia titul="⚙️ Záložníci"  hraci={zaloznici} />}
-      {utocnici.length > 0   && <HraciSekcia titul="⚔️ Útočníci"   hraci={utocnici} />}
+      {sekcie.filter(s => s.data.length > 0).map(s => (
+        <View key={s.titul} style={{ marginBottom: spacing.lg }}>
+          <Text style={styles.hraciSekciaTitul}>{s.titul}</Text>
+          <View style={styles.hraciGrid}>
+            {s.data.map(h => (
+              <View key={h.id} style={styles.hracKarta}>
+                <View style={[styles.hracCislo, s.jeTrener && styles.hracCisloTrener]}>
+                  <Text style={[styles.hracCisloText, s.jeTrener && styles.hracCisloTrenerText]}>{s.jeTrener ? 'T' : (h.cislo_dresu ?? '–')}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.hracMeno} numberOfLines={1}>{h.meno}</Text>
+                  <Text style={styles.hracPriezvisko} numberOfLines={1}>{h.priezvisko}</Text>
+                  {!s.jeTrener && <Text style={styles.hracPozicia}>{h.pozicia}</Text>}
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+      ))}
     </ScrollView>
   )
 }
 
-function HraciSekcia({ titul, hraci, jeTrener }: {
-  titul: string
-  hraci: Hrac[]
-  jeTrener?: boolean
-}) {
-  return (
-    <View style={{ marginBottom: 18 }}>
-      <Text style={styles.hraciSekciaTitul}>{titul}</Text>
-      <View style={styles.hraciGrid}>
-        {hraci.map(h => (
-          <View key={h.id} style={styles.hracKarta}>
-            <View style={[styles.hracCislo, jeTrener && styles.hracCisloTrener]}>
-              <Text style={[styles.hracCisloText, jeTrener && styles.hracCisloTrenerText]}>
-                {jeTrener ? 'T' : (h.cislo_dresu ?? '–')}
-              </Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.hracMeno} numberOfLines={1}>{h.meno}</Text>
-              <Text style={styles.hracPriezvisko} numberOfLines={1}>{h.priezvisko}</Text>
-              {!jeTrener && (
-                <Text style={styles.hracPozicia}>{h.pozicia}</Text>
-              )}
-            </View>
-          </View>
-        ))}
-      </View>
-    </View>
-  )
-}
-
-// ─── Futbalnet tab ─────────────────────────────────────────────────────────
 function FutbalnetTab() {
+  const styles = useStyles()
   return (
     <ScrollView contentContainerStyle={styles.futbalnetWrap} showsVerticalScrollIndicator={false}>
       <View style={styles.futbalnetCard}>
-        <View style={styles.futbalnetLogo}>
-          <Text style={styles.futbalnetLogoText}>FN</Text>
-        </View>
+        <View style={styles.futbalnetLogo}><Icon name="globe" size={32} color="#FFFFFF" /></View>
         <Text style={styles.futbalnetTitle}>Futbalnet.sk</Text>
-        <Text style={styles.futbalnetSub}>
-          Oficiálne výsledky, tabuľka a program pre FC Výčapy-Opatovce
-          v Oblastnej lige Nitra.
-        </Text>
-
-        <TouchableOpacity
-          style={styles.futbalnetBtn}
-          activeOpacity={0.85}
-          onPress={() => Linking.openURL(FUTBALNET_URL)}
-        >
-          <Text style={styles.futbalnetBtnText}>Otvoriť Futbalnet →</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.futbalnetUrl} numberOfLines={1}>
-          sportnet.sme.sk/futbalnet/...
-        </Text>
+        <Text style={styles.futbalnetSub}>Oficiálne výsledky, tabuľka a program pre FC Výčapy-Opatovce v Oblastnej lige Nitra.</Text>
+        <Button title="Otvoriť Futbalnet" variant="secondary" size="lg" fullWidth onPress={() => Linking.openURL(FUTBALNET_URL)} iconRight={<Icon name="arrowRight" size={16} color="#FFFFFF" />} />
       </View>
-
       <View style={styles.infoCard}>
         <Text style={styles.infoTitle}>O klube</Text>
-        <Text style={styles.infoText}>
-          FC Výčapy-Opatovce pôsobí v Oblastnej lige Nitra. Domáce zápasy hráme
-          na obecnom ihrisku v športovom areáli. Pravidelné tréningy, mládežnícke
-          družstvá aj reprezentačný A-tím — sledujte nás na Futbalnet.sk.
-        </Text>
+        <Text style={styles.infoText}>FC Výčapy-Opatovce pôsobí v Oblastnej lige Nitra. Domáce zápasy hráme na obecnom ihrisku. Pravidelné tréningy, mládežnícke družstvá aj A-tím — sledujte nás na Futbalnet.sk.</Text>
       </View>
     </ScrollView>
   )
 }
 
-// ─── Pomocné komponenty ────────────────────────────────────────────────────
-function Loading() {
-  return (
-    <View style={styles.center}>
-      <ActivityIndicator size="large" color={FC_GREEN} />
-    </View>
-  )
-}
-
+function Loading() { const styles = useStyles(); return <View style={styles.center}><ActivityIndicator size="large" color={FC_GREEN} /></View> }
 function ErrorBox({ msg, hint }: { msg: string; hint?: string }) {
-  return (
-    <View style={{ padding: 16 }}>
-      <View style={[styles.errBox, { borderLeftColor: C.brand.red }]}>
-        <Text style={styles.errTitle}>Nepodarilo sa načítať dáta</Text>
-        <Text style={styles.errMsg}>{msg}</Text>
-        {hint && <Text style={styles.errHint}>{hint}</Text>}
-      </View>
-    </View>
-  )
+  const styles = useStyles()
+  return <View style={{ padding: spacing.lg }}><View style={styles.errBox}><Text style={styles.errTitle}>Nepodarilo sa načítať dáta</Text><Text style={styles.errMsg}>{msg}</Text>{hint && <Text style={styles.errHint}>{hint}</Text>}</View></View>
+}
+function Empty({ icon, title }: { icon: IconName; title: string }) {
+  const styles = useStyles(); const t = useThemeColors()
+  return <View style={styles.center}><Icon name={icon} size={52} color={t.textPlaceholder} /><Text style={styles.emptyTitle}>{title}</Text></View>
 }
 
-function Empty({ emoji, title }: { emoji: string; title: string }) {
-  return (
-    <View style={styles.center}>
-      <Text style={{ fontSize: 56 }}>{emoji}</Text>
-      <Text style={{ fontSize: 16, fontWeight: '700', color: C.text, marginTop: 8 }}>{title}</Text>
-    </View>
-  )
-}
+const makeStyles = (t: ThemeColors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: t.background },
+  header: { backgroundColor: FC_GREEN, paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: spacing.lg },
+  back: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', marginBottom: spacing.sm },
+  backText: { color: '#FFFFFF', ...typo.bodyB },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  logo: { width: 56, height: 56, borderRadius: radius.md, backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center' },
+  logoText: { color: FC_GREEN, fontSize: 14, fontFamily: 'Inter_800ExtraBold', lineHeight: 16 },
+  logoVO: { color: FC_GREEN, fontSize: 11, fontFamily: 'Inter_800ExtraBold', letterSpacing: 0.5 },
+  headerTitle: { color: '#FFFFFF', fontSize: 21, fontFamily: fonts.display, letterSpacing: -0.3 },
+  headerSub: { color: 'rgba(255,255,255,0.85)', ...typo.caption, marginTop: 2 },
 
-// ─── Štýly ─────────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.background },
+  tabBar: { flexDirection: 'row', backgroundColor: t.surface, borderBottomWidth: 1, borderBottomColor: t.borderLight },
+  tab: { flex: 1, paddingVertical: spacing.sm, paddingHorizontal: 4, alignItems: 'center', gap: 2, borderBottomWidth: 3, borderBottomColor: 'transparent' },
+  tabActive: { borderBottomColor: FC_GREEN },
+  tabLabel: { ...typo.micro, color: t.textMuted },
+  tabLabelActive: { color: FC_GREEN, fontFamily: 'Inter_800ExtraBold' },
 
-  // Header
-  header: {
-    backgroundColor: FC_GREEN,
-    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20,
-  },
-  back: { alignSelf: 'flex-start', marginBottom: 8 },
-  backText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  logo: {
-    width: 56, height: 56, borderRadius: 14,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 2, borderColor: '#FFFFFF',
-  },
-  logoText: { color: FC_GREEN, fontSize: 14, fontWeight: '900', lineHeight: 16 },
-  logoVO: { color: FC_GREEN, fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
-  headerTitle: {
-    color: '#FFFFFF', fontSize: 20, fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-  headerSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12, marginTop: 2 },
+  list: { padding: spacing.lg, gap: spacing.md },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xxl, gap: spacing.sm },
+  emptyTitle: { ...typo.h3, color: t.text, marginTop: spacing.sm },
 
-  // Tab bar
-  tabBar: {
-    flexDirection: 'row',
-    backgroundColor: C.surface,
-    borderBottomWidth: 1, borderBottomColor: C.borderLight,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 10, paddingHorizontal: 4,
-    alignItems: 'center', gap: 2,
-  },
-  tabActive: { borderBottomWidth: 3, borderBottomColor: FC_GREEN },
-  tabEmoji: { fontSize: 18 },
-  tabLabel: { fontSize: 11, fontWeight: '600', color: C.textMuted },
-  tabLabelActive: { color: FC_GREEN, fontWeight: '800' },
+  zapasKarta: { backgroundColor: t.surface, borderRadius: radius.lg, padding: spacing.lg, ...shadows.sm, shadowColor: t.shadow, gap: spacing.sm },
+  zapasTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  domaBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 4 },
+  domaText: { fontSize: 11, fontFamily: 'Inter_800ExtraBold', letterSpacing: 0.4 },
+  vysledokBadge: { borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 4 },
+  vysledokBadgeText: { fontSize: 11, fontFamily: 'Inter_800ExtraBold' },
+  zapasTitle: { ...typo.h2, color: t.text },
+  skoreRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  skoreTeam: { flex: 1, ...typo.bodyB, color: t.text },
+  skoreBox: { paddingHorizontal: spacing.md, paddingVertical: 6, backgroundColor: t.surfaceAlt, borderRadius: radius.md, minWidth: 78, alignItems: 'center' },
+  skoreText: { fontSize: 22, fontFamily: 'Inter_800ExtraBold', color: t.text, letterSpacing: 1 },
+  zapasMeta: { gap: 5 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  zapasMetaText: { ...typo.caption, color: t.textSecondary },
+  zapasFooter: { borderTopWidth: 1, borderTopColor: t.divider, paddingTop: spacing.sm, marginTop: 2 },
+  zapasLink: { ...typo.captionB, color: FC_GREEN },
 
-  // List a karty
-  list: { padding: 16, gap: 12 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-
-  zapasKarta: {
-    backgroundColor: C.surface,
-    borderRadius: 14,
-    padding: 16,
-    shadowColor: C.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
-    gap: 10,
-  },
-  zapasTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  domaBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-  domaText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4 },
-  vysledokBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-  vysledokBadgeText: { fontSize: 11, fontWeight: '800' },
-
-  zapasTitle: { fontSize: 18, fontWeight: '800', color: C.text },
-  skoreRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  skoreTeam: { flex: 1, fontSize: 14, fontWeight: '700', color: C.text },
-  skoreBox: {
-    paddingHorizontal: 14, paddingVertical: 6,
-    backgroundColor: C.surfaceAlt,
-    borderRadius: 10,
-    minWidth: 78, alignItems: 'center',
-  },
-  skoreText: { fontSize: 22, fontWeight: '900', color: C.text, letterSpacing: 1 },
-
-  zapasMeta: { gap: 4 },
-  zapasMetaText: { fontSize: 13, color: C.textSecondary },
-
-  zapasFooter: {
-    borderTopWidth: 1, borderTopColor: C.divider,
-    paddingTop: 10, marginTop: 4,
-  },
-  zapasLink: { fontSize: 13, fontWeight: '700', color: FC_GREEN },
-
-  // Hráči
-  hraciSekciaTitul: {
-    fontSize: 12, fontWeight: '800', color: C.textMuted,
-    letterSpacing: 0.8, textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-  hraciGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  hracKarta: {
-    flexBasis: '48%', flexGrow: 1,
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: C.surface,
-    borderRadius: 12,
-    padding: 10,
-    shadowColor: C.shadow,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04, shadowRadius: 3, elevation: 1,
-  },
-  hracCislo: {
-    width: 38, height: 38, borderRadius: 19,
-    backgroundColor: FC_GREEN,
-    justifyContent: 'center', alignItems: 'center',
-  },
+  hraciSekciaTitul: { ...typo.label, color: t.textMuted, marginBottom: spacing.sm },
+  hraciGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  hracKarta: { flexBasis: '47%', flexGrow: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: t.surface, borderRadius: radius.md, padding: spacing.sm, ...shadows.sm, shadowColor: t.shadow },
+  hracCislo: { width: 38, height: 38, borderRadius: 19, backgroundColor: FC_GREEN, justifyContent: 'center', alignItems: 'center' },
   hracCisloTrener: { backgroundColor: C.brand.gold },
-  hracCisloText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  hracCisloText: { color: '#FFFFFF', fontSize: 14, fontFamily: 'Inter_800ExtraBold' },
   hracCisloTrenerText: { color: '#5D4037' },
-  hracMeno: { fontSize: 12, color: C.textMuted },
-  hracPriezvisko: { fontSize: 14, fontWeight: '800', color: C.text },
-  hracPozicia: { fontSize: 10, color: C.textPlaceholder, textTransform: 'uppercase', letterSpacing: 0.3 },
+  hracMeno: { ...typo.caption, color: t.textMuted },
+  hracPriezvisko: { ...typo.h3, color: t.text },
+  hracPozicia: { fontSize: 10, color: t.textPlaceholder, textTransform: 'uppercase', letterSpacing: 0.3, fontFamily: 'Inter_600SemiBold' },
 
-  // Futbalnet
-  futbalnetWrap: { padding: 16, gap: 14 },
-  futbalnetCard: {
-    backgroundColor: C.surface,
-    borderRadius: 16,
-    padding: 24, alignItems: 'center', gap: 12,
-    shadowColor: C.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
-  },
-  futbalnetLogo: {
-    width: 72, height: 72, borderRadius: 18,
-    backgroundColor: FC_GREEN,
-    justifyContent: 'center', alignItems: 'center',
-    marginBottom: 4,
-  },
-  futbalnetLogoText: { color: '#FFFFFF', fontSize: 26, fontWeight: '900' },
-  futbalnetTitle: { fontSize: 22, fontWeight: '800', color: C.text },
-  futbalnetSub: {
-    fontSize: 14, color: C.textSecondary,
-    textAlign: 'center', lineHeight: 21,
-    marginBottom: 8, paddingHorizontal: 8,
-  },
-  futbalnetBtn: {
-    backgroundColor: FC_GREEN,
-    borderRadius: 14,
-    paddingVertical: 16, paddingHorizontal: 28,
-    alignSelf: 'stretch', alignItems: 'center',
-  },
-  futbalnetBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
-  futbalnetUrl: { fontSize: 11, color: C.textPlaceholder, marginTop: 4 },
+  futbalnetWrap: { padding: spacing.lg, gap: spacing.md },
+  futbalnetCard: { backgroundColor: t.surface, borderRadius: radius.lg, padding: spacing.xl, alignItems: 'center', gap: spacing.md, ...shadows.md, shadowColor: t.shadow },
+  futbalnetLogo: { width: 72, height: 72, borderRadius: radius.lg, backgroundColor: FC_GREEN, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
+  futbalnetTitle: { ...typo.h1, color: t.text },
+  futbalnetSub: { ...typo.body, color: t.textSecondary, textAlign: 'center', lineHeight: 21, marginBottom: spacing.sm, paddingHorizontal: spacing.sm },
+  infoCard: { backgroundColor: t.surface, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.sm, borderLeftWidth: 4, borderLeftColor: FC_GREEN },
+  infoTitle: { ...typo.h3, color: t.text },
+  infoText: { ...typo.caption, color: t.textSecondary, lineHeight: 19 },
 
-  infoCard: {
-    backgroundColor: C.surface,
-    borderRadius: 14, padding: 16, gap: 8,
-    borderLeftWidth: 4, borderLeftColor: FC_GREEN,
-  },
-  infoTitle: { fontSize: 14, fontWeight: '800', color: C.text },
-  infoText: { fontSize: 13, color: C.textSecondary, lineHeight: 19 },
+  errBox: { backgroundColor: t.surface, borderRadius: radius.lg, padding: spacing.lg, borderLeftWidth: 4, borderLeftColor: C.brand.red, gap: 6 },
+  errTitle: { ...typo.h3, color: C.brand.red },
+  errMsg: { ...typo.caption, color: t.textSecondary, lineHeight: 19 },
+  errHint: { ...typo.micro, color: t.textMuted, lineHeight: 18 },
 
-  // Error
-  errBox: {
-    backgroundColor: C.surface, borderRadius: 14, padding: 16,
-    borderLeftWidth: 4, gap: 6,
-  },
-  errTitle: { fontSize: 14, fontWeight: '800', color: C.brand.red },
-  errMsg: { fontSize: 13, color: C.textSecondary, lineHeight: 19 },
-  errHint: { fontSize: 12, color: C.textMuted, lineHeight: 18 },
-
-  // Mode bar v Program tabe
-  fcModeBar: {
-    flexDirection: 'row', gap: 8, marginBottom: 4,
-  },
-  fcModeBtn: {
-    flex: 1, paddingVertical: 8, borderRadius: 8,
-    backgroundColor: C.surfaceAlt, alignItems: 'center',
-    borderWidth: 1, borderColor: 'transparent',
-  },
+  fcModeBar: { flexDirection: 'row', gap: spacing.sm, marginBottom: 2 },
+  fcModeBtn: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5, paddingVertical: spacing.sm, borderRadius: radius.sm, backgroundColor: t.surfaceAlt, borderWidth: 1, borderColor: 'transparent' },
   fcModeBtnActive: { backgroundColor: FC_GREEN_LIGHT, borderColor: FC_GREEN },
-  fcModeBtnText: { fontSize: 12, fontWeight: '700', color: C.textMuted },
+  fcModeBtnText: { ...typo.caption, fontFamily: 'Inter_700Bold', color: t.textMuted },
   fcModeBtnTextActive: { color: FC_GREEN },
-
-  fcMonthHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    marginTop: 4, marginBottom: 4,
-  },
-  fcMonthLine: { flex: 1, height: 1, backgroundColor: C.border },
-  fcMonthLabel: {
-    fontSize: 12, fontWeight: '800', color: C.textMuted,
-    letterSpacing: 0.5, textTransform: 'uppercase',
-  },
+  fcMonthHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginVertical: 2 },
+  fcMonthLine: { flex: 1, height: 1, backgroundColor: t.border },
+  fcMonthLabel: { ...typo.label, color: t.textMuted },
 })

@@ -20,31 +20,33 @@ import { useColorScheme } from 'react-native'
 export type ThemeMode = 'light' | 'dark' | 'auto'
 export type ColorScheme = 'light' | 'dark'
 
+// Moderná neutrálna paleta na báze slate/navy (Tailwind-style) — chladnejšia,
+// kohéznejšia a lepšie ladí s akcentovými gradientmi než ploché šedé.
 const lightTokens = {
-  background:      '#F7F8FA',
+  background:      '#F2F5F9',  // slate-100/50 — jemne chladné pozadie
   surface:         '#FFFFFF',
-  surfaceAlt:      '#FAFAFA',
-  text:            '#1A1A1A',
-  textSecondary:   '#555555',
-  textMuted:       '#888888',
-  textPlaceholder: '#BBBBBB',
-  border:          '#E0E0E0',
-  borderLight:     '#EEEEEE',
-  divider:         '#F0F0F0',
-  shadow:          '#000000',
+  surfaceAlt:      '#F1F5F9',  // slate-100
+  text:            '#0F172A',  // slate-900
+  textSecondary:   '#475569',  // slate-600
+  textMuted:       '#64748B',  // slate-500
+  textPlaceholder: '#CBD5E1',  // slate-300
+  border:          '#E2E8F0',  // slate-200
+  borderLight:     '#EDF1F7',
+  divider:         '#F1F5F9',
+  shadow:          '#1E293B',  // slate-tinted soft shadow (modernejšie než čierna)
 }
 
 const darkTokens = {
-  background:      '#0F0F12',
-  surface:         '#1B1B1F',
-  surfaceAlt:      '#252529',
-  text:            '#F5F5F7',
-  textSecondary:   '#C0C0C5',
-  textMuted:       '#888892',
-  textPlaceholder: '#5B5B65',
-  border:          '#36363D',
-  borderLight:     '#2A2A30',
-  divider:         '#2A2A30',
+  background:      '#0B1120',  // deep navy-slate
+  surface:         '#151C2C',
+  surfaceAlt:      '#1E273A',
+  text:            '#F1F5F9',  // slate-100
+  textSecondary:   '#CBD5E1',  // slate-300
+  textMuted:       '#8593AB',
+  textPlaceholder: '#475569',  // slate-600
+  border:          '#293349',
+  borderLight:     '#1F2737',
+  divider:         '#1F2737',
   shadow:          '#000000',
 }
 
