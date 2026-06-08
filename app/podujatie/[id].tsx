@@ -1,4 +1,7 @@
 import { C } from '@/constants/colors'
+import { useBookmark } from '@/src/hooks/useBookmarks'
+import { pridajDoKalendara } from '@/src/lib/ical'
+import { zdielajPodujatie } from '@/src/lib/share'
 import { supabase } from '@/src/lib/supabase'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
@@ -69,6 +72,37 @@ export default function PodujatieDetail() {
     ? KATEGORIA_CONFIG[podujatie.kategoria] ?? KATEGORIA_CONFIG.ine
     : KATEGORIA_CONFIG.ine
 
+  const bookmark = useBookmark(
+    podujatie
+      ? {
+          id: podujatie.id,
+          kind: 'podujatie',
+          title: podujatie.title,
+          podtitul: podujatie.miesto ?? undefined,
+          kategoria: podujatie.kategoria,
+          emoji: kat.emoji,
+          datum: podujatie.datum_od,
+        }
+      : null,
+  )
+
+  async function zdielat() {
+    if (!podujatie) return
+    await zdielajPodujatie(podujatie)
+  }
+
+  async function pridatDoKal() {
+    if (!podujatie) return
+    await pridajDoKalendara({
+      id: podujatie.id,
+      title: podujatie.title,
+      description: podujatie.popis ?? undefined,
+      location: podujatie.miesto ?? undefined,
+      start: podujatie.datum_od,
+      end: podujatie.datum_do ?? undefined,
+    })
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor={C.surface} />
@@ -77,6 +111,26 @@ export default function PodujatieDetail() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Text style={styles.backText}>← Späť</Text>
         </TouchableOpacity>
+        {podujatie && (
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity
+              onPress={bookmark.toggle}
+              style={[styles.iconBtn, bookmark.isMarked && styles.iconBtnActive]}
+              accessibilityRole="button"
+              accessibilityLabel={bookmark.isMarked ? 'Odstrániť z môjho zoznamu' : 'Pridať do môjho zoznamu'}
+            >
+              <Text style={styles.iconText}>{bookmark.isMarked ? '🔖' : '🏷️'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={zdielat}
+              style={styles.iconBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Zdieľať podujatie"
+            >
+              <Text style={styles.iconText}>↗</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {loading && (
@@ -132,6 +186,19 @@ export default function PodujatieDetail() {
             <View style={styles.divider} />
           )}
 
+          {!jeMinule(podujatie.datum_od) && (
+            <TouchableOpacity
+              style={styles.calBtn}
+              onPress={pridatDoKal}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Pridať podujatie do kalendára"
+            >
+              <Text style={styles.calBtnEmoji}>📅</Text>
+              <Text style={styles.calBtnText}>Pridať do kalendára</Text>
+            </TouchableOpacity>
+          )}
+
           <Text style={styles.disclaimer}>
             Pre viac informácií kontaktujte obecný úrad.
           </Text>
@@ -180,9 +247,35 @@ const styles = StyleSheet.create({
   navBar: {
     paddingHorizontal: 16, paddingVertical: 12,
     borderBottomWidth: 1, borderBottomColor: C.borderLight,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   backBtn: { alignSelf: 'flex-start' },
   backText: { fontSize: 16, color: C.primary, fontWeight: '700' },
+  iconBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: C.primaryLight,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  iconBtnActive: {
+    backgroundColor: C.accent + '33',
+    borderWidth: 2,
+    borderColor: C.primary,
+  },
+  iconText: { fontSize: 18, color: C.primary, fontWeight: '800' },
+  calBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: C.secondary,
+    borderRadius: 14,
+    paddingVertical: 16,
+    marginTop: 20,
+  },
+  calBtnEmoji: { fontSize: 22 },
+  calBtnText: { color: C.onPrimary, fontSize: 15, fontWeight: '800' },
 
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8 },
   errorIcon: { fontSize: 48 },

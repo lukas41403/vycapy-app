@@ -60,6 +60,28 @@ export type Ordinant = {
   poznamka?: string          // "Ordinácia aj v Dolných Lefantovciach"
 }
 
+// ─── Obecné sviatky ──────────────────────────────────────────────────────
+export type ObecnySviatok = {
+  id: string
+  nazov: string
+  mesiac: number              // 1-12
+  den: number                 // 1-31
+  ikona?: string              // emoji (default 🎉)
+  popis?: string              // krátky popis (Sv. Urban — patrón vinohradníkov)
+}
+
+// ─── Život obce — obecné noviny PDF archív ───────────────────────────────
+export type ObecneNoviny = {
+  id: string
+  rok: number
+  cislo: number              // 1, 2, 3...
+  nazov?: string             // "Jarné vydanie 2026"
+  datum: string              // YYYY-MM-DD
+  pdfUrl: string
+  coverUrl?: string          // titulná strana ako thumbnail
+  pocetStran?: number
+}
+
 // ─── Voľný čas v okolí ───────────────────────────────────────────────────
 export type VolnyCasKategoria =
   | 'cyklotrasa' | 'turistika' | 'deti' | 'wellness'
@@ -172,6 +194,12 @@ export type Tenant = {
   mapaCentrum: { lat: number; lng: number; zoom: number }
   pointyZaujmu: PointZaujmu[]
   volnyCasMiesta: VolnyCasMiesto[]
+
+  // Obecné sviatky (sv. Urban, hody, Deň obce)
+  obecneSviatky?: ObecnySviatok[]
+
+  // Obecné noviny PDF archív
+  obecneNoviny?: ObecneNoviny[]
 
   // Social
   socialLinks?: {
@@ -772,6 +800,63 @@ export const vycapyOpatovce: Tenant = {
     },
   ],
 
+  // ─── OBECNÉ SVIATKY ──────────────────────────────────────────────────
+  obecneSviatky: [
+    { id: 'sv-urban',  nazov: 'Sv. Urban — patrón vinohradníkov', mesiac: 5, den: 25,
+      ikona: '🍷', popis: 'Tradičné požehnanie vinohradov v Sosne' },
+    { id: 'den-obce',  nazov: 'Deň obce Výčapy-Opatovce',         mesiac: 6, den: 14,
+      ikona: '🎉', popis: 'Hlavná obecná slávnosť' },
+    { id: 'hody',      nazov: 'Hody Výčapy-Opatovce',             mesiac: 8, den: 15,
+      ikona: '🎪', popis: 'Tradičné obecné hody' },
+    { id: 'posviacka', nazov: 'Posviacka kostola',                mesiac: 11, den: 11,
+      ikona: '⛪', popis: 'Sv. Martin — patrón obce' },
+  ],
+
+  // ─── OBECNÉ NOVINY "ŽIVOT OBCE" ──────────────────────────────────────
+  // Reálne čísla zo stránky obce (po doplnení obecou)
+  obecneNoviny: [
+    {
+      id: '2026-1',
+      rok: 2026, cislo: 1,
+      nazov: 'Jarné vydanie 2026',
+      datum: '2026-03-15',
+      pdfUrl: 'https://www.vycapy-opatovce.sk/obecne-noviny-zivot-obce-0.html',
+      pocetStran: 24,
+    },
+    {
+      id: '2025-4',
+      rok: 2025, cislo: 4,
+      nazov: 'Vianočné vydanie 2025',
+      datum: '2025-12-10',
+      pdfUrl: 'https://www.vycapy-opatovce.sk/obecne-noviny-zivot-obce-0.html',
+      pocetStran: 32,
+    },
+    {
+      id: '2025-3',
+      rok: 2025, cislo: 3,
+      nazov: 'Jesenné vydanie 2025',
+      datum: '2025-09-20',
+      pdfUrl: 'https://www.vycapy-opatovce.sk/obecne-noviny-zivot-obce-0.html',
+      pocetStran: 28,
+    },
+    {
+      id: '2025-2',
+      rok: 2025, cislo: 2,
+      nazov: 'Letné vydanie 2025',
+      datum: '2025-06-15',
+      pdfUrl: 'https://www.vycapy-opatovce.sk/obecne-noviny-zivot-obce-0.html',
+      pocetStran: 24,
+    },
+    {
+      id: '2025-1',
+      rok: 2025, cislo: 1,
+      nazov: 'Jarné vydanie 2025',
+      datum: '2025-03-10',
+      pdfUrl: 'https://www.vycapy-opatovce.sk/obecne-noviny-zivot-obce-0.html',
+      pocetStran: 20,
+    },
+  ],
+
   socialLinks: {
     web: 'https://www.vycapy-opatovce.sk',
   },
@@ -797,13 +882,24 @@ export function getTenant(): Tenant {
 }
 
 // ─── React hook ───────────────────────────────────────────────────────────
-// Kvôli kompatibilite s hooks chained calls neskôr (pre Supabase-driven config)
-// to wrappneme do hooku — teraz vracia konštantu, neskôr zhodne signatúru.
+// Wrapper okolo tenantStore — reaktívne reaguje na zmenu aktívnej obce.
+// Pre multi-tenant scenár (viac obcí v jednej appke).
 
-import { useMemo } from 'react'
+import { useEffect, useState } from 'react'
 
 export function useTenant(): Tenant {
-  return useMemo(() => getTenant(), [])
+  // Lazy import aby nedošlo k cyklickej závislosti
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getActiveTenant, subscribeTenant } = require('./tenantStore') as typeof import('./tenantStore')
+
+  const [t, setT] = useState<Tenant>(() => getActiveTenant())
+
+  useEffect(() => {
+    const unsub = subscribeTenant((next) => setT(next))
+    return () => { unsub() }
+  }, [])
+
+  return t
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────

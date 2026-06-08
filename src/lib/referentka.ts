@@ -100,12 +100,64 @@ export type Sprava = { rola: Rola; obsah: string }
 
 /**
  * Pošle správu Marte a vráti jej odpoveď.
- * Hodí Error s informatívnou správou, ktorú UI môže zobraziť.
+ *
+ * V produkcii volá Supabase Edge Function 'marta-chat' (server-side):
+ *   - API kľúč je iba na serveri (bezpečné)
+ *   - Edge Function má rate limit 10 dotazov/min/IP
+ *
+ * Fallback: ak EXPO_PUBLIC_USE_EDGE_FUNCTION=false, volá Anthropic priamo
+ * (development mode, kľúč v .env).
  */
 export async function opytajSaReferentky(
   sprava: string,
   historia: Sprava[],
 ): Promise<string> {
+  const useEdge = (process.env.EXPO_PUBLIC_USE_EDGE_FUNCTION ?? 'true') !== 'false'
+
+  if (useEdge) {
+    return await opytajSaCezEdgeFunction(sprava, historia)
+  }
+  return await opytajSaPrimoAnthropic(sprava, historia)
+}
+
+// ─── Edge Function (PRODUKČNÁ cesta) ────────────────────────────────────
+async function opytajSaCezEdgeFunction(sprava: string, historia: Sprava[]): Promise<string> {
+  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Chýba SUPABASE_URL alebo SUPABASE_ANON_KEY v .env')
+  }
+
+  let response: Response
+  try {
+    response = await fetch(`${supabaseUrl}/functions/v1/marta-chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseAnonKey}`,
+        'apikey': supabaseAnonKey,
+      },
+      body: JSON.stringify({ sprava, historia }),
+    })
+  } catch (e: any) {
+    throw new Error('Sieťová chyba: ' + (e?.message ?? 'fetch zlyhal'))
+  }
+
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    if (response.status === 429) {
+      throw new Error('Príliš veľa otázok naraz. Skúste o chvíľu.')
+    }
+    throw new Error(data?.error ?? `Marta nie je dostupná (${response.status})`)
+  }
+  if (typeof data?.odpoved !== 'string') {
+    throw new Error('Neočakávaný formát odpovede od Edge Function')
+  }
+  return data.odpoved
+}
+
+// ─── Priame volanie Anthropic (DEV cesta — kľúč v JS bundle) ─────────────
+async function opytajSaPrimoAnthropic(sprava: string, historia: Sprava[]): Promise<string> {
   const apiKey = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY
   if (!apiKey) {
     throw new Error(
@@ -121,12 +173,10 @@ export async function opytajSaReferentky(
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
-        // Niektoré prostredia (web bundler) vyžadujú tento header aby fetch
-        // nešiel cez CORS preflight, ktorý Anthropic blokuje:
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: process.env.EXPO_PUBLIC_ANTHROPIC_MODEL || 'claude-sonnet-4-6',
         max_tokens: 512,
         system: SYSTEM_PROMPT,
         messages: [

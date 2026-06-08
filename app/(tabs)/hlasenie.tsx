@@ -203,7 +203,7 @@ export default function HlasenieScreen() {
               <Text style={styles.trackingLabel}>VAŠE ČÍSLO PODNETU</Text>
               <Text style={styles.trackingId}>{trackingId.slice(0, 8).toUpperCase()}</Text>
               <Text style={styles.trackingHint}>
-                Stav podnetu sa zmení na „v riešení" a „vyriešené" v aplikácii.
+                {'Stav podnetu sa zmení na „v riešení“ a „vyriešené“ v aplikácii.'}
               </Text>
             </View>
           )}

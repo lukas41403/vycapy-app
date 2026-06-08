@@ -7,6 +7,7 @@
  */
 
 import { AppHeader } from '@/components/AppHeader'
+import { WebSourceBadge } from '@/components/ui'
 import { C } from '@/constants/colors'
 import { useAktuality } from '@/src/hooks/useAktuality'
 import { Image } from 'expo-image'
@@ -338,6 +339,9 @@ function ListCard({ item, router }: { item: AktualitaItem; router: any }) {
         )}
         <View style={styles.cardFooter}>
           <Text style={styles.readMore}>Čítať viac →</Text>
+          {item.source === 'webygroup' && (
+            <WebSourceBadge source="webygroup" variant="badge" />
+          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -513,7 +517,10 @@ const styles = StyleSheet.create({
     lineHeight: 24, marginBottom: 6, letterSpacing: -0.2,
   },
   cardPerex: { fontSize: 14, color: C.textSecondary, lineHeight: 20, marginBottom: 12 },
-  cardFooter: { borderTopWidth: 1, borderTopColor: C.divider, paddingTop: 10 },
+  cardFooter: {
+    borderTopWidth: 1, borderTopColor: C.divider, paddingTop: 10,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8,
+  },
   readMore: { fontSize: 13, fontWeight: '700', color: C.primary },
 
   // GRID

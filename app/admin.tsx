@@ -1182,7 +1182,7 @@ function PrenajomKarta({
       </View>
 
       {z.poznamka && (
-        <Text style={prenajomStyles.poznamka}>„{z.poznamka}"</Text>
+        <Text style={prenajomStyles.poznamka}>{'„'}{z.poznamka}{'“'}</Text>
       )}
 
       <View style={prenajomStyles.kontakty}>
@@ -1390,7 +1390,7 @@ function AnketyAdminPanel() {
                 : <Text style={styles.submitBtnText}>🗳️ Spustiť anketu</Text>}
             </TouchableOpacity>
             <Text style={{ fontSize: 12, color: C.textMuted, textAlign: 'center', marginTop: 12 }}>
-              Občania uvidia anketu v menu „Viac → Ankety obce".
+              {'Občania uvidia anketu v menu „Viac → Ankety obce“.'}
             </Text>
           </View>
         </ScrollView>
@@ -1853,6 +1853,11 @@ function AdminDashboard({
   const [aktualityCount, setAktualityCount] = useState<number | null>(null)
   const [najblizsiVyvoz, setNajblizsiVyvoz] = useState<{ typ: string; datum: string } | null>(null)
   const [posledneOtazky, setPosledneOtazky] = useState<{ obsah: string; created_at: string }[]>([])
+  const [rssStatus, setRssStatus] = useState<{
+    poslednySync: string | null
+    spolu: number
+    zwebygroup: number
+  } | null>(null)
 
   useEffect(() => {
     nacitaj()
@@ -1888,6 +1893,41 @@ function AdminDashboard({
       .order('created_at', { ascending: false })
       .limit(3)
     setPosledneOtazky((konv as any) || [])
+
+    // RSS sync status — koľko aktualít zo source='webygroup' a kedy bol posledný sync
+    try {
+      const { count: spoluCount } = await supabase
+        .from('aktuality')
+        .select('id', { count: 'exact', head: true })
+      const { count: wgCount } = await supabase
+        .from('aktuality')
+        .select('id', { count: 'exact', head: true })
+        .eq('source', 'webygroup')
+      const { data: log } = await supabase
+        .from('rss_sync_log')
+        .select('created_at')
+        .order('created_at', { ascending: false })
+        .limit(1)
+      setRssStatus({
+        poslednySync: (log as any)?.[0]?.created_at ?? null,
+        spolu: spoluCount ?? 0,
+        zwebygroup: wgCount ?? 0,
+      })
+    } catch {
+      // tabuľka rss_sync_log môže ešte chýbať
+      setRssStatus(null)
+    }
+  }
+
+  function relTime(iso: string | null): string {
+    if (!iso) return 'nikdy'
+    const d = new Date(iso)
+    const min = Math.round((Date.now() - d.getTime()) / 60000)
+    if (min < 1) return 'práve teraz'
+    if (min < 60) return `pred ${min} min`
+    const h = Math.round(min / 60)
+    if (h < 24) return `pred ${h} h`
+    return d.toLocaleDateString('sk-SK', { day: 'numeric', month: 'short' })
   }
 
   const aktivnePodnety = hlasenia.filter(h => h.status === 'nove' || h.status === 'v_rieseni').length
@@ -1951,6 +1991,41 @@ function AdminDashboard({
           <Text style={[dashStyles.kpiNumber, { color: C.primary, fontSize: 18 }]}>+ Nové</Text>
           <Text style={dashStyles.kpiLabel}>publikovať oznam</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* RSS Synchronizácia z webygroup */}
+      <View style={dashStyles.section}>
+        <Text style={dashStyles.sectionLabel}>🌐 SYNCHRONIZÁCIA S WEBOM OBCE</Text>
+        <View style={dashStyles.rssCard}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={dashStyles.rssIcon}>
+              <Text style={{ fontSize: 22 }}>🔄</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={dashStyles.rssTitle}>
+                {rssStatus?.zwebygroup ?? 0} aktualít z vycapy-opatovce.sk
+              </Text>
+              <Text style={dashStyles.rssSub}>
+                Posledný sync: {relTime(rssStatus?.poslednySync ?? null)}
+                {rssStatus?.zwebygroup ? ` · automaticky každých 15 min` : ''}
+              </Text>
+            </View>
+            <View style={[dashStyles.rssBadge, {
+              backgroundColor: rssStatus?.zwebygroup ? C.status.success.bg : C.status.warning.bg
+            }]}>
+              <Text style={[dashStyles.rssBadgeText, {
+                color: rssStatus?.zwebygroup ? C.status.success.fg : C.status.warning.fg
+              }]}>
+                {rssStatus?.zwebygroup ? '✓ AKTÍVNE' : 'PRIPRAVUJE SA'}
+              </Text>
+            </View>
+          </View>
+          <Text style={dashStyles.rssHint}>
+            Referentky pracujú vo WebyGroup CMS ako doteraz.
+            Aplikácia si oznamy ťahá automaticky.
+            Žiadna duplicitná práca.
+          </Text>
+        </View>
       </View>
 
       {/* Posledné Marta otázky */}
@@ -2047,6 +2122,38 @@ const dashStyles = StyleSheet.create({
   sectionLabel: {
     fontSize: 11, fontWeight: '800', color: C.textMuted,
     letterSpacing: 0.8, marginBottom: 6,
+  },
+
+  rssCard: {
+    backgroundColor: C.surface,
+    borderRadius: 14,
+    padding: 14,
+    borderLeftWidth: 4,
+    borderLeftColor: '#0277BD',
+    shadowColor: C.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+    gap: 10,
+  },
+  rssIcon: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: '#E1F5FE',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  rssTitle: { fontSize: 14, fontWeight: '800', color: C.text },
+  rssSub: { fontSize: 11, color: C.textMuted, marginTop: 2, fontWeight: '600' },
+  rssBadge: {
+    paddingHorizontal: 8, paddingVertical: 4,
+    borderRadius: 8,
+  },
+  rssBadgeText: { fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
+  rssHint: {
+    fontSize: 11, color: C.textSecondary, lineHeight: 16,
+    fontStyle: 'italic',
+    backgroundColor: C.surfaceAlt,
+    padding: 10, borderRadius: 8,
   },
 
   qBox: {

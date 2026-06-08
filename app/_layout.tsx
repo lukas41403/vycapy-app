@@ -1,3 +1,4 @@
+import { initTenantStore } from '@/src/config/tenantStore'
 import { registerForPushNotifications } from '@/src/lib/pushNotifications'
 import { ThemeProvider as VOThemeProvider, useThemeMode } from '@/src/theme/ThemeContext'
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native'
@@ -25,6 +26,8 @@ function NavigationWithTheme() {
   // Defenzívne — ak balík expo-notifications nie je nainštalovaný, funkcia
   // tichá vráti null a appka funguje normálne.
   useEffect(() => {
+    // Multi-tenant: načítaj uloženú voľbu obce z AsyncStorage
+    initTenantStore().catch(() => {})
     registerForPushNotifications().catch(() => {})
   }, [])
 

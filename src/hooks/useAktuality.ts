@@ -10,6 +10,10 @@ export type Aktualita = {
   kategoria: 'oznam' | 'akcia' | 'uzavierka' | 'vypadok' | 'sport' | 'ine'
   published_at: string | null
   is_published?: boolean
+  // RSS sync metadata (voliteľné — môže byť NULL pre manuálny obsah)
+  source?: 'manual' | 'webygroup' | 'import' | string | null
+  external_id?: string | null
+  synced_at?: string | null
 }
 
 /**

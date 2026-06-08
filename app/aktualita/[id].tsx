@@ -2,17 +2,18 @@
  * Detail aktuality — article layout.
  */
 
+import { WebSourceBadge } from '@/components/ui'
 import { C } from '@/constants/colors'
+import { useBookmark } from '@/src/hooks/useBookmarks'
+import { zdielajAktualitu } from '@/src/lib/share'
 import { supabase } from '@/src/lib/supabase'
 import { Image } from 'expo-image'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   SafeAreaView,
   ScrollView,
-  Share,
   StatusBar,
   StyleSheet,
   Text,
@@ -28,6 +29,9 @@ type Aktualita = {
   kategoria: string
   published_at: string | null
   cover_url: string | null
+  source?: string | null
+  external_id?: string | null
+  synced_at?: string | null
 }
 
 const KATEGORIA_FARBY: Record<string, { bg: string; text: string }> = {
@@ -73,16 +77,27 @@ export default function AktualitaDetail() {
     fetch()
   }, [id])
 
+  const bookmark = useBookmark(
+    aktualita
+      ? {
+          id: aktualita.id,
+          kind: 'aktualita',
+          title: aktualita.title,
+          podtitul: aktualita.perex ?? undefined,
+          kategoria: aktualita.kategoria,
+          datum: aktualita.published_at ?? undefined,
+        }
+      : null,
+  )
+
   async function zdielat() {
     if (!aktualita) return
-    try {
-      await Share.share({
-        title: aktualita.title,
-        message: `${aktualita.title}\n\n${aktualita.perex || aktualita.body.slice(0, 200) + '...'}\n\n— Obec Výčapy-Opatovce`,
-      })
-    } catch {
-      Alert.alert('Chyba', 'Zdieľanie zlyhalo.')
-    }
+    await zdielajAktualitu({
+      id: aktualita.id,
+      title: aktualita.title,
+      perex: aktualita.perex,
+      body: aktualita.body,
+    })
   }
 
   const kat = aktualita
@@ -102,9 +117,26 @@ export default function AktualitaDetail() {
           <Text style={styles.backText}>← Späť</Text>
         </TouchableOpacity>
         {aktualita && (
-          <TouchableOpacity onPress={zdielat} style={styles.shareIcon}>
-            <Text style={styles.shareIconText}>↗</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity
+              onPress={bookmark.toggle}
+              style={[styles.shareIcon, bookmark.isMarked && styles.shareIconActive]}
+              accessibilityRole="button"
+              accessibilityLabel={bookmark.isMarked ? 'Odstrániť z môjho zoznamu' : 'Pridať do môjho zoznamu'}
+            >
+              <Text style={[styles.shareIconText, bookmark.isMarked && { color: C.primary }]}>
+                {bookmark.isMarked ? '🔖' : '🏷️'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={zdielat}
+              style={styles.shareIcon}
+              accessibilityRole="button"
+              accessibilityLabel="Zdieľať aktualitu"
+            >
+              <Text style={styles.shareIconText}>↗</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
 
@@ -166,6 +198,18 @@ export default function AktualitaDetail() {
             {/* Body */}
             <Text style={styles.body}>{aktualita.body}</Text>
 
+            {/* RSS source indikátor — ak aktualita pochádza z webygroup */}
+            {aktualita.source === 'webygroup' && (
+              <View style={{ marginTop: 24 }}>
+                <WebSourceBadge
+                  source={aktualita.source}
+                  externalUrl={aktualita.external_id ?? undefined}
+                  syncedAt={aktualita.synced_at ?? undefined}
+                  variant="card"
+                />
+              </View>
+            )}
+
             {/* Akcie */}
             <View style={styles.actions}>
               <TouchableOpacity
@@ -222,6 +266,11 @@ const styles = StyleSheet.create({
     width: 36, height: 36, borderRadius: 18,
     backgroundColor: C.primaryLight,
     justifyContent: 'center', alignItems: 'center',
+  },
+  shareIconActive: {
+    backgroundColor: C.accent + '33',
+    borderWidth: 2,
+    borderColor: C.primary,
   },
   shareIconText: { fontSize: 18, color: C.primary, fontWeight: '800' },
 

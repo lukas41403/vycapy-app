@@ -17,6 +17,7 @@ import { ErbBadge } from '@/components/AppHeader'
 import { Badge, Card, SectionHeader } from '@/components/ui'
 import { WeatherCard } from '@/components/WeatherCard'
 import { useTenant, uradStatusDnes } from '@/src/config/tenant'
+import { useDnesneSviatky } from '@/src/lib/meniny'
 import { useAktuality } from '@/src/hooks/useAktuality'
 import { useOdpady } from '@/src/hooks/useOdpady'
 import { usePodujatia } from '@/src/hooks/usePodujatia'
@@ -118,6 +119,7 @@ export default function DashboardScreen() {
   const pozdrav = useMemo(() => pozdravPodlaCasu(), [])
   const dnes = useMemo(() => formatDnes(), [])
   const stavUradu = useMemo(() => uradStatusDnes(tenant), [tenant])
+  const { dnesneMeniny, sviatky } = useDnesneSviatky()
 
   const najblizsiVyvoz = odpady[0]
   const poslednych2 = aktuality.slice(0, 2)
@@ -196,6 +198,31 @@ export default function DashboardScreen() {
             <Text style={styles.heroGreet}>
               {pozdrav.text}! {pozdrav.emoji}
             </Text>
+
+            {/* Meniny + sviatky pill */}
+            {(dnesneMeniny.meno || sviatky.length > 0) && (
+              <View style={styles.meninyPill}>
+                {sviatky[0] ? (
+                  <>
+                    <Text style={styles.meninyEmoji}>{sviatky[0].ikona}</Text>
+                    <Text style={styles.meninyText} numberOfLines={1}>
+                      {sviatky[0].nazov}
+                      {dnesneMeniny.meno && !sviatky[0].nazov.includes(dnesneMeniny.meno) && (
+                        ` · meniny: ${dnesneMeniny.meno}`
+                      )}
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.meninyEmoji}>🎂</Text>
+                    <Text style={styles.meninyText} numberOfLines={1}>
+                      Meniny: {dnesneMeniny.meno}
+                    </Text>
+                  </>
+                )}
+              </View>
+            )}
+
             <View style={[styles.uradPill, { backgroundColor: stavUradu.jeOtvoreneTeraz ? 'rgba(105,240,174,0.18)' : 'rgba(255,255,255,0.18)' }]}>
               <View style={[styles.uradDot, { backgroundColor: stavUradu.jeOtvoreneTeraz ? '#69F0AE' : '#FFCDD2' }]} />
               <Text style={styles.uradText}>
@@ -461,6 +488,19 @@ const styles = StyleSheet.create({
   heroDate: { color: 'rgba(255,255,255,0.85)', fontSize: 13, marginTop: 2 },
   heroBottom: { gap: spacing.sm },
   heroGreet: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  meninyPill: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(255,232,180,0.25)',
+  },
+  meninyEmoji: { fontSize: 13 },
+  meninyText: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
+
   uradPill: {
     alignSelf: 'flex-start',
     flexDirection: 'row',

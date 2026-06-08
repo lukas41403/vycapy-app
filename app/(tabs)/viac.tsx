@@ -83,6 +83,22 @@ export default function ViacScreen() {
       farba: '#5D4037',
     },
     {
+      id: 'moj-zoznam',
+      emoji: '🔖',
+      title: 'Môj zoznam',
+      subtitle: 'Uložené aktuality, podujatia a výlety',
+      path: '/moj-zoznam',
+      farba: '#AD1457',
+    },
+    {
+      id: 'susedsky-predaj',
+      emoji: '🛒',
+      title: 'Susedský predaj',
+      subtitle: 'Bazár medzi občanmi · predám, kúpim, zadarmo',
+      path: '/susedsky-predaj',
+      farba: '#AD1457',
+    },
+    {
       id: 'okolie',
       emoji: '🌍',
       title: 'Voľný čas v okolí',
@@ -97,6 +113,14 @@ export default function ViacScreen() {
       subtitle: 'Autobusy a vlaky cez obec',
       path: '/cestovny-poriadok',
       farba: '#F57F17',
+    },
+    {
+      id: 'noviny',
+      emoji: '📰',
+      title: 'Život obce',
+      subtitle: 'Archív obecných novín v PDF',
+      path: '/noviny',
+      farba: '#5D4037',
     },
     {
       id: 'pocasie',

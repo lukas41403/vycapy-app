@@ -7,7 +7,14 @@
 import { AppHeader } from '@/components/AppHeader'
 import { C } from '@/constants/colors'
 import { useOdpady } from '@/src/hooks/useOdpady'
-import { useMemo, useState } from 'react'
+import {
+  naplanujNotifikacieOdpadu,
+  suNotifikacieOdpaduZapnute,
+  vyziadajPermissionPreOdpad,
+  zrusVsetkyNotifikacieOdpadu,
+} from '@/src/lib/odpadyNotifikacie'
+import { useEffect, useMemo, useState } from 'react'
+import { Alert } from 'react-native'
 import {
   ActivityIndicator,
   FlatList,
@@ -44,6 +51,50 @@ export default function OdpadyScreen() {
   const { odpady, loading, error, refresh } = useOdpady()
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [refreshing, setRefreshing] = useState(false)
+  const [notifikacieZap, setNotifikacieZap] = useState<boolean | null>(null)
+
+  // Zistí aktuálny stav pri otvorení obrazovky
+  useEffect(() => {
+    suNotifikacieOdpaduZapnute().then(setNotifikacieZap)
+  }, [])
+
+  // Pri zmene odpadov reschedule notifikácie (ak sú zapnuté)
+  useEffect(() => {
+    if (notifikacieZap && odpady.length > 0) {
+      naplanujNotifikacieOdpadu(odpady).catch(() => {})
+    }
+  }, [odpady, notifikacieZap])
+
+  async function toggleNotifikacie() {
+    if (notifikacieZap) {
+      // Vypnúť
+      const zrusene = await zrusVsetkyNotifikacieOdpadu()
+      setNotifikacieZap(false)
+      Alert.alert(
+        'Pripomienky vypnuté',
+        zrusene > 0 ? `Zrušených ${zrusene} naplánovaných pripomienok.` : 'Pripomienky boli vypnuté.',
+      )
+    } else {
+      // Zapnúť — najprv permission
+      const ok = await vyziadajPermissionPreOdpad()
+      if (!ok) {
+        Alert.alert(
+          'Notifikácie zakázané',
+          'Pre pripomienky pred vývozom odpadu musí appka mať povolenie posielať notifikácie. ' +
+          'Povoľte ich v Nastaveniach telefónu.',
+        )
+        return
+      }
+      const result = await naplanujNotifikacieOdpadu(odpady)
+      setNotifikacieZap(true)
+      Alert.alert(
+        '🔔 Pripomienky zapnuté',
+        result
+          ? `Naplánovaných ${result.naplanovane} pripomienok. Deň pred každým vývozom o 18:00 dostanete upozornenie.`
+          : 'Pripomienky boli zapnuté. Deň pred každým vývozom o 18:00 dostanete upozornenie.',
+      )
+    }
+  }
 
   async function handleRefresh() {
     setRefreshing(true)
@@ -61,18 +112,51 @@ export default function OdpadyScreen() {
       />
 
       {!loading && !error && odpady.length > 0 && (
-        <View style={styles.modeBar}>
-          <ModeBtn
-            label="☰ Zoznam"
-            active={viewMode === 'list'}
-            onPress={() => setViewMode('list')}
-          />
-          <ModeBtn
-            label="📅 Mesiac"
-            active={viewMode === 'month'}
-            onPress={() => setViewMode('month')}
-          />
-        </View>
+        <>
+          {/* Notifikácie toggle */}
+          <TouchableOpacity
+            style={[
+              styles.notifyBar,
+              notifikacieZap && styles.notifyBarActive,
+            ]}
+            onPress={toggleNotifikacie}
+            activeOpacity={0.85}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: !!notifikacieZap }}
+          >
+            <Text style={styles.notifyEmoji}>
+              {notifikacieZap ? '🔔' : '🔕'}
+            </Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.notifyTitle, notifikacieZap && styles.notifyTitleActive]}>
+                {notifikacieZap
+                  ? 'Pripomienky zapnuté'
+                  : 'Zapnúť pripomienky pred vývozom'}
+              </Text>
+              <Text style={styles.notifySub}>
+                {notifikacieZap
+                  ? 'Deň pred vývozom o 18:00 dostanete notifikáciu'
+                  : 'Klepnite a každý deň pred vývozom dostanete upozornenie'}
+              </Text>
+            </View>
+            <View style={[styles.notifyToggle, notifikacieZap && styles.notifyToggleOn]}>
+              <View style={[styles.notifyKnob, notifikacieZap && styles.notifyKnobOn]} />
+            </View>
+          </TouchableOpacity>
+
+          <View style={styles.modeBar}>
+            <ModeBtn
+              label="☰ Zoznam"
+              active={viewMode === 'list'}
+              onPress={() => setViewMode('list')}
+            />
+            <ModeBtn
+              label="📅 Mesiac"
+              active={viewMode === 'month'}
+              onPress={() => setViewMode('month')}
+            />
+          </View>
+        </>
       )}
 
       {loading && (
@@ -389,6 +473,36 @@ const styles = StyleSheet.create({
     fontSize: 14, color: C.textMuted, textAlign: 'center',
     lineHeight: 20, marginTop: 4,
   },
+
+  // Notify bar
+  notifyBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 14,
+    backgroundColor: C.surface,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: C.border,
+  },
+  notifyBarActive: {
+    backgroundColor: C.secondaryLight,
+    borderColor: C.secondary,
+  },
+  notifyEmoji: { fontSize: 24 },
+  notifyTitle: { fontSize: 14, fontWeight: '800', color: C.text },
+  notifyTitleActive: { color: C.secondaryDark },
+  notifySub: { fontSize: 11, color: C.textMuted, marginTop: 2, lineHeight: 15 },
+  notifyToggle: {
+    width: 44, height: 26, borderRadius: 13,
+    backgroundColor: C.border,
+    padding: 2, justifyContent: 'center',
+  },
+  notifyToggleOn: { backgroundColor: C.secondary },
+  notifyKnob: { width: 22, height: 22, borderRadius: 11, backgroundColor: C.surface },
+  notifyKnobOn: { alignSelf: 'flex-end' },
 
   // Mode bar
   modeBar: {
