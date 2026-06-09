@@ -36,10 +36,10 @@ DO $$ BEGIN
   CREATE POLICY "hlaseniafotos_read" ON storage.objects
     FOR SELECT USING (bucket_id = 'hlaseniafotos');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN
-  CREATE POLICY "aktuality_covers_upload" ON storage.objects
-    FOR INSERT WITH CHECK (bucket_id = 'aktuality-covers');
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+-- Nahrávanie obálok aktualít IBA prihlásený admin (občan aktuality nepridáva).
+DROP POLICY IF EXISTS "aktuality_covers_upload" ON storage.objects;
+CREATE POLICY "aktuality_covers_upload" ON storage.objects
+  FOR INSERT WITH CHECK (bucket_id = 'aktuality-covers' AND auth.role() = 'authenticated');
 DO $$ BEGIN
   CREATE POLICY "aktuality_covers_read" ON storage.objects
     FOR SELECT USING (bucket_id = 'aktuality-covers');
@@ -64,12 +64,15 @@ CREATE TABLE IF NOT EXISTS public.obecne_zariadenia (
 );
 
 ALTER TABLE public.obecne_zariadenia ENABLE ROW LEVEL SECURITY;
+-- Čítanie verejné (občan vidí stav osvetlenia/senzorov na mape).
 DO $$ BEGIN
   CREATE POLICY "zariadenia_read" ON public.obecne_zariadenia FOR SELECT USING (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN
-  CREATE POLICY "zariadenia_update" ON public.obecne_zariadenia FOR UPDATE USING (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+-- Zmena stavu (toggle osvetlenia) IBA prihlásený starosta/admin.
+-- DROP+CREATE: aby sa na existujúcej DB prepísala pôvodná USING(true) politika.
+DROP POLICY IF EXISTS "zariadenia_update" ON public.obecne_zariadenia;
+CREATE POLICY "zariadenia_update" ON public.obecne_zariadenia
+  FOR UPDATE USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
 
 -- Seed (len ak ešte nie sú)
 INSERT INTO public.obecne_zariadenia (nazov, typ, ulica, stav, posledna_hodnota, jednotka)
@@ -164,12 +167,15 @@ CREATE TABLE IF NOT EXISTS public.ai_konverzacie (
 );
 
 ALTER TABLE public.ai_konverzacie ENABLE ROW LEVEL SECURITY;
+-- Zápis: anonymný občan (chat sa ukladá bez prihlásenia) — ostáva povolené.
 DO $$ BEGIN
   CREATE POLICY "konverzacie_insert" ON public.ai_konverzacie FOR INSERT WITH CHECK (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN
-  CREATE POLICY "konverzacie_read" ON public.ai_konverzacie FOR SELECT USING (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+-- Čítanie histórie konverzácií IBA prihlásený admin (súkromie občanov).
+-- Chat v appke číta históriu z pamäte, nie z DB — sprísnenie ho nerozbije.
+DROP POLICY IF EXISTS "konverzacie_read" ON public.ai_konverzacie;
+CREATE POLICY "konverzacie_read" ON public.ai_konverzacie
+  FOR SELECT USING (auth.role() = 'authenticated');
 
 
 -- ────────────────────────────────────────────────────────────────────────
@@ -196,18 +202,22 @@ CREATE TABLE IF NOT EXISTS public.hlasy (
 
 ALTER TABLE public.ankety ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.hlasy  ENABLE ROW LEVEL SECURITY;
+-- Čítanie ankiet aj výsledkov verejné (občan vidí ankety a priebežné výsledky).
 DO $$ BEGIN
   CREATE POLICY "ankety_read"  ON public.ankety FOR SELECT USING (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN
-  CREATE POLICY "ankety_insert" ON public.ankety FOR INSERT WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN
-  CREATE POLICY "ankety_update" ON public.ankety FOR UPDATE USING (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN
-  CREATE POLICY "ankety_delete" ON public.ankety FOR DELETE USING (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+-- Vytvorenie / úprava / zmazanie ankety IBA prihlásený admin.
+DROP POLICY IF EXISTS "ankety_insert" ON public.ankety;
+CREATE POLICY "ankety_insert" ON public.ankety
+  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "ankety_update" ON public.ankety;
+CREATE POLICY "ankety_update" ON public.ankety
+  FOR UPDATE USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "ankety_delete" ON public.ankety;
+CREATE POLICY "ankety_delete" ON public.ankety
+  FOR DELETE USING (auth.role() = 'authenticated');
+-- Hlasy: čítanie verejné, vkladanie anonymné (občan hlasuje bez prihlásenia).
+-- Proti zneužitiu chráni UNIQUE(anketa_id, device_id) — jeden hlas na zariadenie.
 DO $$ BEGIN
   CREATE POLICY "hlasy_read"   ON public.hlasy  FOR SELECT USING (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
@@ -243,9 +253,12 @@ CREATE TABLE IF NOT EXISTS public.push_tokens (
 );
 
 ALTER TABLE public.push_tokens ENABLE ROW LEVEL SECURITY;
-DO $$ BEGIN
-  CREATE POLICY "tokens_read"   ON public.push_tokens FOR SELECT USING (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+-- Čítanie zoznamu tokenov IBA prihlásený starosta (odoslatVarovanie v dashboarde).
+-- Inak by ktokoľvek s anon kľúčom vedel vytiahnuť všetky push tokeny zariadení.
+DROP POLICY IF EXISTS "tokens_read" ON public.push_tokens;
+CREATE POLICY "tokens_read" ON public.push_tokens
+  FOR SELECT USING (auth.role() = 'authenticated');
+-- Registrácia tokenu zariadenia je anonymná (upsert pri štarte appky) — ostáva.
 DO $$ BEGIN
   CREATE POLICY "tokens_upsert" ON public.push_tokens FOR INSERT WITH CHECK (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
